@@ -402,6 +402,34 @@ label.lbl { font-size: 13.5px; color: var(--text-dim); display: block; margin-bo
   flex: 0 0 26px; font-size: 24px; color: var(--text-mute); line-height: 1;
 }
 
+/* 联动页的五步链路卡片 */
+.chain-flow {
+  display: flex; align-items: stretch; gap: 2px; flex-wrap: wrap;
+}
+.chain-card {
+  flex: 1 1 172px; min-width: 0; position: relative;
+  background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 9px; padding: 15px 13px 14px;
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+}
+.chain-art {
+  width: 54px; height: 54px; border-radius: 11px; margin-bottom: 9px;
+  background: #fff; border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+}
+.chain-no {
+  position: absolute; top: 8px; right: 8px;
+  width: 20px; height: 20px; border-radius: 50%;
+  color: #fff; font-size: 12px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.chain-label { font-size: 14.5px; color: var(--ink); margin-bottom: 4px; }
+.chain-desc { font-size: 12.5px; color: var(--text-dim); line-height: 1.55; }
+.chain-arrow {
+  position: absolute; right: -11px; top: 50%; transform: translateY(-50%);
+  color: var(--text-mute); font-size: 22px; line-height: 1; z-index: 2;
+}
+
 /* 分层明细里的图标条目 */
 .detail {
   background: var(--panel-2); border-radius: 8px;

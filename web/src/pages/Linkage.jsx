@@ -5,13 +5,16 @@ import {
 } from 'recharts';
 import { FieldMap } from '../components/FieldMap.jsx';
 import { chainLabel } from './Overview.jsx';
+import {
+  IconScan, IconDispatch, IconRobot, IconConfirm, IconSpray,
+} from '../components/Icons.jsx';
 
 const CHAIN_STEPS = [
-  { key: 'uav_detect',   label: '空中发现', desc: '无人机巡航采集，实时识别出疑似病斑' },
-  { key: 'cloud_dispatch', label: '云端派单', desc: '按置信度/病位判定是否需近地复核' },
-  { key: 'robot_recheck', label: '机器人复核', desc: '地面机器人驶向目标，近距补拍叶下/根茎' },
-  { key: 'cloud_confirm', label: '云端确认', desc: '融合空中+地面证据，确认病害种类与范围' },
-  { key: 'uav_spray',    label: '靶向喷洒', desc: '生成施药任务，按速度-喷洒比例执行' },
+  { key: 'uav_detect',   icon: IconScan,    color: 'var(--uav)',   label: '空中发现', desc: '无人机巡航采集，实时识别出疑似病斑' },
+  { key: 'cloud_dispatch', icon: IconDispatch, color: 'var(--warn)', label: '云端派单', desc: '按置信度/病位判定是否需近地复核' },
+  { key: 'robot_recheck', icon: IconRobot,  color: 'var(--robot)', label: '机器人复核', desc: '地面机器人驶向目标，近距补拍叶下/根茎' },
+  { key: 'cloud_confirm', icon: IconConfirm, color: 'var(--accent)', label: '云端确认', desc: '融合空中+地面证据，确认病害种类与范围' },
+  { key: 'uav_spray',    icon: IconSpray,   color: 'var(--uav)',   label: '靶向喷洒', desc: '生成施药任务，按速度-喷洒比例执行' },
 ];
 
 export default function Linkage({ meta, devices, detections, events, overview }) {
@@ -68,27 +71,17 @@ export default function Linkage({ meta, devices, detections, events, overview })
       {/* 联动链路示意 */}
       <div className="card" style={{ marginBottom: 12 }}>
         <h3>联动闭环 <span className="tag">每次闭环全链时延可追溯</span></h3>
-        <div className="grid g5" style={{ gap: 10 }}>
+        <div className="chain-flow">
           {CHAIN_STEPS.map((s, i) => (
-            <div key={s.key} style={{
-              padding: '11px 12px', borderRadius: 7,
-              background: 'var(--panel-2)', border: '1px solid var(--border)',
-              position: 'relative',
-            }}>
-              <div className="row" style={{ gap: 7, marginBottom: 4 }}>
-                <span style={{
-                  width: 20, height: 20, borderRadius: '50%', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', fontSize: 12.5,
-                  background: 'var(--bg)', border: '1px solid var(--accent-2)', color: 'var(--accent-2)',
-                }}>{i + 1}</span>
-                <b className="small">{s.label}</b>
-              </div>
-              <div className="xs dim">{s.desc}</div>
+            <div key={s.key} className="chain-card">
+              <span className="chain-art" style={{ color: s.color }}>
+                <s.icon size={34} color={s.color} />
+              </span>
+              <span className="chain-no" style={{ background: s.color }}>{i + 1}</span>
+              <b className="chain-label">{s.label}</b>
+              <div className="chain-desc">{s.desc}</div>
               {i < CHAIN_STEPS.length - 1 && (
-                <span style={{
-                  position: 'absolute', right: -11, top: '50%', transform: 'translateY(-50%)',
-                  color: 'var(--text-mute)', zIndex: 2,
-                }}>›</span>
+                <span className="chain-arrow" aria-hidden="true">›</span>
               )}
             </div>
           ))}
