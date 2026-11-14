@@ -62,13 +62,13 @@ export default function SceneDiagram({ height = 420 }) {
         <text x="620" y="336" fontSize="14" textAnchor="middle" fill="#dc2626" fontWeight="700">!</text>
         <text x="700" y="366" fontSize="14" textAnchor="middle" fill="#dc2626" fontWeight="700">!</text>
         <text x="820" y="326" fontSize="14" textAnchor="middle" fill="#dc2626" fontWeight="700">!</text>
-        <text x="705" y="440" fontSize="17" textAnchor="middle" fill={INK} fontWeight="600">麦田 · 5 m 网格划区</text>
-        <text x="705" y="462" fontSize="14" textAnchor="middle" fill="#6b7d84">红色圆斑 = 识别出的疑似病斑</text>
+        <text x="705" y="436" fontSize="17" textAnchor="middle" fill={INK} fontWeight="600">麦田 · 5 m 网格划区</text>
+        <text x="705" y="457" fontSize="14" textAnchor="middle" fill="#6b7d84">红色圆斑 = 识别出的疑似病斑</text>
       </g>
 
       {/* ---------- 左侧道路 / 机器人活动区 ---------- */}
       <path d="M40 412 L460 412" stroke="#c8d3d4" strokeWidth="3" strokeDasharray="14 10" />
-      <text x="250" y="440" fontSize="17" textAnchor="middle" fill={INK} fontWeight="600">地面机器人作业面</text>
+      <text x="160" y="440" fontSize="17" textAnchor="middle" fill={INK} fontWeight="600">地面机器人作业面</text>
 
       {/* ---------- 云端 ---------- */}
       <g>
@@ -140,29 +140,30 @@ export default function SceneDiagram({ height = 420 }) {
       {/* 无人机 → 云端 */}
       <path d="M268 78 L338 78" stroke={BLUE} strokeWidth="3" strokeDasharray="9 6" fill="none" />
       <path d="M332 71 L344 78 L332 85" fill="none" stroke={BLUE} strokeWidth="3" strokeLinejoin="round" />
-      <text x="303" y="62" fontSize="13" textAnchor="middle" fill={BLUE} fontWeight="700">遥测 5–10 Hz</text>
+      <text x="303" y="62" fontSize="13" textAnchor="middle" fill={BLUE} fontWeight="700" stroke="#ffffff" strokeWidth="3.5" paintOrder="stroke">遥测 5–10 Hz</text>
 
       {/* 云端 → 无人机（任务下发）*/}
       <path d="M356 128 L268 138" stroke={AMBER} strokeWidth="3" strokeDasharray="9 6" fill="none" />
       <path d="M276 132 L262 140 L276 146" fill="none" stroke={AMBER} strokeWidth="3" strokeLinejoin="round" />
-      <text x="312" y="128" fontSize="13" textAnchor="middle" fill={AMBER} fontWeight="700">喷洒任务</text>
+      <text x="312" y="116" fontSize="13" textAnchor="middle" fill={AMBER} fontWeight="700" stroke="#ffffff" strokeWidth="3.5" paintOrder="stroke">喷洒任务</text>
 
       {/* 云端 → 机器人（派单） */}
       <path d="M430 130 C 430 210, 380 240, 372 296" stroke={AMBER} strokeWidth="3" strokeDasharray="9 6" fill="none" />
       <path d="M378 288 L371 302 L385 300" fill="none" stroke={AMBER} strokeWidth="3" strokeLinejoin="round" />
-      <text x="452" y="212" fontSize="13" fill={AMBER} fontWeight="700">派单复核</text>
+      <text x="452" y="212" fontSize="13" fill={AMBER} fontWeight="700" stroke="#ffffff" strokeWidth="3.5" paintOrder="stroke">派单复核</text>
 
       {/* 机器人 → 云端（复核结果） */}
       <path d="M470 320 C 520 300, 520 210, 470 150" stroke={PURPLE} strokeWidth="3" strokeDasharray="9 6" fill="none" />
       <path d="M478 158 L468 143 L484 146" fill="none" stroke={PURPLE} strokeWidth="3" strokeLinejoin="round" />
-      <text x="530" y="248" fontSize="13" fill={PURPLE} fontWeight="700">复核证据</text>
+      <text x="530" y="248" fontSize="13" fill={PURPLE} fontWeight="700" stroke="#ffffff" strokeWidth="3.5" paintOrder="stroke">复核证据</text>
 
       {/* ---------- 底部时延条 ---------- */}
-      <g transform="translate(24,398)">
-        <rect x="0" y="0" width="250" height="52" rx="10" fill="#ffffff" stroke="#d5dee0" strokeWidth="2" />
-        <text x="14" y="22" fontSize="14" fill="#6b7d84">闭环端到端时延</text>
-        <text x="14" y="43" fontSize="21" fontWeight="700" fill={GREEN}>1.8 s</text>
-        <text x="86" y="43" fontSize="13" fill="#6b7d84">感知 120 / 下发 90 / 到位 1600 ms</text>
+      <g transform="translate(24,308)">
+        <rect x="0" y="0" width="268" height="70" rx="10" fill="#ffffff" stroke="#d5dee0" strokeWidth="2" />
+        <text x="14" y="21" fontSize="13" fill="#6b7d84">闭环端到端时延</text>
+        <text x="14" y="53" fontSize="23" fontWeight="700" fill={GREEN}>1.8 s</text>
+        <text x="112" y="36" fontSize="12.5" fill="#6b7d84">感知 120 / 下发 90</text>
+        <text x="112" y="56" fontSize="12.5" fill="#6b7d84">到位 1600 ms</text>
       </g>
     </svg>
   );
