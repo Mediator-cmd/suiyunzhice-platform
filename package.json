@@ -1,0 +1,29 @@
+{
+  "name": "maitian-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "麦田智翼 · 空地协同精准植保云平台",
+  "type": "module",
+  "workspaces": ["web"],
+  "scripts": {
+    "dev": "node server/src/index.js",
+    "dev:web": "npm run dev -w web",
+    "build": "npm run build -w web",
+    "start": "node server/src/index.js",
+    "seed": "node server/src/seed.js"
+  },
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "vite": "^6.0.7",
+    "@vitejs/plugin-react": "^4.3.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.15.0",
+    "leaflet": "^1.9.4",
+    "react-leaflet": "^4.2.1"
+  }
+}
