@@ -16,6 +16,7 @@ import { Analytics } from '../../shared/analytics.js';
 import { LinkageEngine } from '../../shared/linkage.js';
 import { Simulator } from '../../shared/simulator.js';
 import { LinkStats } from '../../shared/linkstats.js';
+import { buildSprayMissions } from '../../shared/spraydispatch.js';
 import {
   generateSprayRoute, solveSprayRatio, scoreRoute,
 } from '../../shared/planner.js';
@@ -82,7 +83,7 @@ class LocalEngine {
     this.store = new MemoryStore();
     this.platform = new Platform({ store: this.store });
     this.field = this.platform.field;
-    this.analytics = new Analytics(this.store);
+    this.analytics = new Analytics(this.store, this.field);
     this.linkage = new LinkageEngine({ store: this.store, onEvent: () => {} });
     this.stats = new LinkStats();
     this.listeners = new Set();
@@ -121,9 +122,36 @@ class LocalEngine {
           this.store.insertMission(mission);
           this.emit('mission', mission);
         }
+        // 确诊结果累积到一定密度 → 自动生成靶向施药作业单（省药闭环）
+        this.maybeDispatchSpray();
       },
     });
     this.sim.start();
+  }
+
+  /**
+   * 自动派工：确诊病害在某个管理分区累积到阈值后，
+   * 生成一条带「飞行速度 × 喷洒速度」比例的靶向施药作业单。
+   * 与服务端共用 shared/spraydispatch.js，保证两端口径一致。
+   */
+  maybeDispatchSpray() {
+    const now = Date.now();
+    if (now - (this.lastSprayDispatch || 0) < 8000) return;  // 节流，避免刷屏
+    this.lastSprayDispatch = now;
+
+    const dets = this.store.listDetections(500);
+    const missions = this.store.listMissions(5000);
+    const built = buildSprayMissions({
+      field: this.field,
+      dets,
+      missions,
+      plan: this.platform.getPlan().best,
+    });
+    for (const b of built) {
+      this.store.insertMission(b.mission);
+      this.emit('mission', b.mission);
+      this.emit('sprayPlan', { mission: b.mission, ratio: b.ratio });
+    }
   }
 
   stop() { this.sim?.stop(); this.sim = null; }

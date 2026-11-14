@@ -95,6 +95,8 @@ export class MemoryStore {
       plan: m.plan || {},
       status: m.status ?? 'pending',
       cells: m.target?.cells ?? [],
+      zoneId: m.zoneId ?? m.target?.zone ?? null,
+      zoneName: m.zoneName ?? null,
     };
     const i = this.missions.findIndex(x => x.missionId === rec.missionId);
     if (i >= 0) this.missions[i] = rec; else this.missions.push(rec);

@@ -1,15 +1,54 @@
 import React, { useMemo } from 'react';
-import { MapContainer, ImageOverlay, Polygon, Polyline, Marker, CircleMarker, Tooltip } from 'react-leaflet';
+import { MapContainer, Polygon, Polyline, Marker, CircleMarker, Tooltip, Rectangle } from 'react-leaflet';
 import L from 'leaflet';
 import { MAP, DISEASE_COLOR } from '../theme.js';
 
 /**
  * 地块地图：本地 ENU 坐标 → Leaflet 的 CRS.Simple
  * 不用在线瓦片，保证离线/内网/演示环境都能渲染。
+ *
+ * 地图上标出三类具体信息：
+ *  1) 5 m 作业网格（作业单位）
+ *  2) A~H 八个管理区（把 200 m × 100 m 划成 50 m × 50 m 的作业分区）
+ *  3) 障碍区（排水沟 / 配电房，带名称）
+ * 设备用内联 SVG 画出无人机与机器人的具体形状，而不是一个圆点。
  */
 
+/* ---------- 设备图标：俯视具体造型 ---------- */
+const UAV_GLYPH = `
+<svg viewBox="0 0 40 40" width="34" height="34">
+  <g fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round">
+    <path d="M13 13 L27 27 M27 13 L13 27"/>
+  </g>
+  <g fill="#ffffff">
+    <ellipse cx="9" cy="9" rx="7" ry="3.2"/>
+    <ellipse cx="31" cy="9" rx="7" ry="3.2"/>
+    <ellipse cx="9" cy="31" rx="7" ry="3.2"/>
+    <ellipse cx="31" cy="31" rx="7" ry="3.2"/>
+  </g>
+  <g fill="none" stroke="#ffffff" stroke-width="2.4">
+    <path d="M9 9 L16 16 M31 9 L24 16 M9 31 L16 24 M31 31 L24 24"/>
+  </g>
+  <rect x="14" y="14" width="12" height="12" rx="2" fill="#ffffff"/>
+  <rect x="17" y="17" width="6" height="6" rx="1" fill="#0284c7"/>
+</svg>`;
+
+const ROBOT_GLYPH = `
+<svg viewBox="0 0 40 40" width="32" height="32">
+  <rect x="8" y="9" width="24" height="22" rx="4" fill="#ffffff"/>
+  <rect x="11" y="12" width="18" height="9" rx="2" fill="#b91c1c"/>
+  <circle cx="20" cy="16.5" r="2.6" fill="#ffffff"/>
+  <rect x="12" y="24" width="16" height="3.4" rx="1.4" fill="#b91c1c"/>
+  <g fill="#ffffff" stroke="#b91c1c" stroke-width="2">
+    <rect x="3" y="12" width="6" height="9" rx="2"/>
+    <rect x="31" y="12" width="6" height="9" rx="2"/>
+    <rect x="3" y="23" width="6" height="9" rx="2"/>
+    <rect x="31" y="23" width="6" height="9" rx="2"/>
+  </g>
+</svg>`;
+
 export function FieldMap({
-  field, route, devices, detections, events, height = 460, onGridClick, selectedGrid,
+  field, route, devices, detections, events, missions, height = 460, onGridClick, selectedGrid,
 }) {
   if (!field) return null;
 
@@ -40,15 +79,64 @@ export function FieldMap({
     return out;
   }, [detections, field]);
 
+  /* ---------- 5 m 作业网格线 ---------- */
+  const gridLines = useMemo(() => {
+    const lines = [];
+    const cw = field.widthM / field.gridCols;
+    const ch = field.heightM / field.gridRows;
+    for (let c = 1; c < field.gridCols; c++) {
+      const x = c * cw;
+      lines.push([toLL(x, 0), toLL(x, field.heightM)]);
+    }
+    for (let r = 1; r < field.gridRows; r++) {
+      const y = r * ch;
+      lines.push([toLL(0, y), toLL(field.widthM, y)]);
+    }
+    return lines;
+  }, [field]);
+
+  /* ---------- 管理区：直接取平台下发的分区定义（A~H），与作业单 zoneId 同源 ---------- */
+  const zones = useMemo(() => {
+    // 平台 meta 已下发 zones（来自共享 shared/planner.js 的 Field.zones()）
+    const src = field.zones?.length
+      ? field.zones
+      : (() => {
+        // 兜底：后端未升级时本地按 4×2 推算
+        const zc = 4, zr = 2;
+        const zw = field.widthM / zc, zh = field.heightM / zr;
+        const out = [];
+        for (let r = 0; r < zr; r++) {
+          for (let c = 0; c < zc; c++) {
+            const i = r * zc + c;
+            out.push({
+              id: String.fromCharCode(65 + i),
+              x: c * zw, y: r * zh, w: zw, h: zh,
+            });
+          }
+        }
+        return out;
+      })();
+
+    return src.map((z, i) => ({
+      key: z.id || String(i),
+      letter: z.id || String.fromCharCode(65 + i),
+      x: z.x, y: z.y, w: z.w, h: z.h,
+      // 标签放在左上角内侧，避免压住中心网格
+      labelPos: toLL(z.x + 4, z.y + 4),
+    }));
+  }, [field]);
+
   const routeLine = useMemo(() => {
     if (!route?.points?.length) return null;
     return route.points.map(p => toLL(p.x, p.y));
   }, [route]);
 
   const obstaclePolys = useMemo(() =>
-    (field.obstacles || []).map(o => [
-      toLL(o.x, o.y), toLL(o.x + o.w, o.y), toLL(o.x + o.w, o.y + o.h), toLL(o.x, o.y + o.h),
-    ]), [field]);
+    (field.obstacles || []).map(o => ({
+      ...o,
+      poly: [toLL(o.x, o.y), toLL(o.x + o.w, o.y), toLL(o.x + o.w, o.y + o.h), toLL(o.x, o.y + o.h)],
+      center: toLL(o.x + o.w / 2, o.y + o.h / 2),
+    })), [field]);
 
   // 事件标记
   const eventMarks = useMemo(() => {
@@ -65,6 +153,17 @@ export function FieldMap({
     pos: toLL(d.pos.x, d.pos.y),
   }));
 
+  /* ---------- 正在作业的管理分区（靶向施药任务） ---------- */
+  const activeZones = useMemo(() => {
+    const set = new Map();
+    for (const m of missions || []) {
+      if (m.type !== 'spray') continue;
+      const zid = m.zoneId || m.target?.zone;
+      if (zid) set.set(zid, m);
+    }
+    return set;
+  }, [missions]);
+
   return (
     <div className="map-wrap" style={{ height }}>
       <MapContainer
@@ -80,10 +179,63 @@ export function FieldMap({
           pathOptions={{ color: MAP.fieldStroke, weight: 1.5, fillColor: MAP.fieldFill, fillOpacity: 0.95 }}
         />
 
+        {/* 管理区划分：虚线框 + 角标字母 */}
+        {zones.map(z => {
+          const active = activeZones.get(z.letter);
+          return (
+            <Rectangle
+              key={z.key}
+              bounds={[toLL(z.x, z.y), toLL(z.x + z.w, z.y + z.h)]}
+              pathOptions={{
+                color: active ? '#ca8a04' : '#7ba888',
+                weight: active ? 2.4 : 1.6,
+                dashArray: active ? null : '8 6',
+                fill: !!active,
+                fillColor: '#ca8a04',
+                fillOpacity: active ? 0.16 : 0,
+              }}
+            />
+          );
+        })}
+        {zones.map(z => {
+          const active = activeZones.get(z.letter);
+          return (
+            <Marker
+              key={`lbl_${z.key}`}
+              position={z.labelPos}
+              interactive={false}
+              icon={L.divIcon({
+                className: 'zone-label-icon',
+                html: `<div class="zone-label${active ? ' active' : ''}">${z.letter}区${active ? ' · 作业中' : ''}</div>`,
+                iconSize: [78, 18],
+                iconAnchor: [39, 9],
+              })}
+            />
+          );
+        })}
+
+        {/* 5 m 作业网格线 */}
+        {gridLines.map((l, i) => (
+          <Polyline key={`g${i}`} positions={l}
+            pathOptions={{ color: '#9fbfab', weight: 0.8, opacity: 0.75 }} />
+        ))}
+
         {/* 障碍区 */}
-        {obstaclePolys.map((poly, i) => (
-          <Polygon key={i} positions={poly}
-            pathOptions={{ color: MAP.obstacleStroke, weight: 1.5, dashArray: '4 3', fillColor: MAP.obstacleFill, fillOpacity: 0.75 }} />
+        {obstaclePolys.map((o, i) => (
+          <React.Fragment key={i}>
+            <Polygon positions={o.poly}
+              pathOptions={{ color: MAP.obstacleStroke, weight: 1.6, dashArray: '4 3', fillColor: MAP.obstacleFill, fillOpacity: 0.9 }} />
+            <Marker
+              position={o.center}
+              interactive={false}
+              icon={L.divIcon({
+                className: 'obstacle-label-icon',
+                html: `<div class="obstacle-label">${o.label || '障碍'}</div>`,
+                iconSize: [72, 20],
+                iconAnchor: [36, 10],
+              })}
+            />
+          </React.Fragment>
         ))}
 
         {/* 病害网格 */}
@@ -121,20 +273,20 @@ export function FieldMap({
           </CircleMarker>
         ))}
 
-        {/* 设备 */}
+        {/* 设备：无人机 / 机器人 的具体造型 */}
         {deviceMarks.map(({ d, pos }) => (
           <Marker key={d.deviceId} position={pos}
             icon={L.divIcon({
               className: 'dev-marker',
-              html: `<div style="
-                width:16px;height:16px;border-radius:50%;
-                background:${d.kind === 'uav' ? '#0284c7' : '#b91c1c'};
-                border:2px solid #ffffff; box-shadow:0 1px 4px rgba(28,43,34,.35);
-              "></div>`,
-              iconSize: [16, 16], iconAnchor: [8, 8],
+              html: `<div class="dev-glyph ${d.kind === 'uav' ? 'uav' : 'robot'}">${
+                d.kind === 'uav' ? UAV_GLYPH : ROBOT_GLYPH
+              }</div>`,
+              iconSize: [36, 36],
+              iconAnchor: [18, 18],
             })}>
-            <Tooltip direction="top" offset={[0, -10]}>
+            <Tooltip direction="top" offset={[0, -18]}>
               <b>{d.name || d.deviceId}</b><br />
+              {d.kind === 'uav' ? '植保无人机' : '地面监测机器人'}<br />
               状态 {d.state} · 电量 {d.batt ?? '—'}%<br />
               坐标 ({d.pos.x?.toFixed(1)}, {d.pos.y?.toFixed(1)}) m
             </Tooltip>

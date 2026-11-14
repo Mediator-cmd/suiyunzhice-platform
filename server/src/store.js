@@ -64,6 +64,32 @@ export class Store {
         disease TEXT, volume_l REAL, dose REAL, speed REAL, agent TEXT
       );
     `);
+    this.migrateMissions();
+  }
+
+  /**
+   * 任务表补列（幂等）。
+   * 新增字段用于承载靶向施药作业单的完整参数：
+   *   zone_id       作业管理分区（A~H）
+   *   zone_name     分区显示名
+   *   flow_per_speed 流量÷飞行速度 的比例锁
+   *   duty_cycle    喷阀占空比
+   *   saved_vs_uniform_l 相对整田均匀喷施节约的药量
+   */
+  migrateMissions() {
+    const cols = this.db.prepare(`PRAGMA table_info(missions)`).all().map(c => c.name);
+    const add = [
+      ['zone_id', 'TEXT'],
+      ['zone_name', 'TEXT'],
+      ['flow_per_speed', 'REAL'],
+      ['duty_cycle', 'REAL'],
+      ['saved_vs_uniform_l', 'REAL'],
+    ];
+    for (const [name, type] of add) {
+      if (!cols.includes(name)) {
+        this.db.exec(`ALTER TABLE missions ADD COLUMN ${name} ${type}`);
+      }
+    }
   }
 
   // ---- 地块 ----
@@ -159,15 +185,21 @@ export class Store {
   insertMission(m) {
     this.db.prepare(`INSERT OR REPLACE INTO missions
       (mission_id,created_at,type,grid_row,grid_col,disease,speed,swath,flow,dose,agent,
-       algo,length_m,est_minutes,est_volume_l,eco_score,status,cell_ids)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+       algo,length_m,est_minutes,est_volume_l,eco_score,status,cell_ids,
+       zone_id,zone_name,flow_per_speed,duty_cycle,saved_vs_uniform_l)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(nz(m.missionId), nz(m.createdAt), nz(m.type), nz(m.target?.grid?.row),
         nz(m.target?.grid?.col), nz(m.disease),
         nz(m.spray?.speed), nz(m.spray?.swath), nz(m.spray?.flow),
         nz(m.spray?.dose), nz(m.spray?.agent),
         nz(m.plan?.algo), nz(m.plan?.length), nz(m.plan?.estMinutes),
-        nz(m.plan?.estDose), nz(m.plan?.ecoScore),
-        nz(m.status ?? 'pending'), JSON.stringify(m.target?.cells ?? []));
+        // 修正：原先误写 estDose，导致 est_volume_l 恒为空、节药率算不出来
+        nz(m.plan?.estVolumeL ?? m.plan?.estDose),
+        nz(m.plan?.ecoScore),
+        nz(m.status ?? 'pending'), JSON.stringify(m.target?.cells ?? []),
+        nz(m.zoneId ?? m.target?.zone), nz(m.zoneName),
+        nz(m.spray?.flowPerSpeed), nz(m.spray?.dutyCycle),
+        nz(m.plan?.savedVsUniformL));
   }
   updateMissionStatus(missionId, status) {
     this.db.prepare(`UPDATE missions SET status=? WHERE mission_id=?`).run(status, missionId);
@@ -176,9 +208,18 @@ export class Store {
     return this.db.prepare(`SELECT * FROM missions ORDER BY created_at DESC LIMIT ?`).all(limit).map(r => ({
       missionId: r.mission_id, createdAt: r.created_at, type: r.type,
       grid: { row: r.grid_row, col: r.grid_col }, disease: r.disease,
-      spray: { speed: r.speed, swath: r.swath, flow: r.flow, dose: r.dose, agent: r.agent },
-      plan: { algo: r.algo, length: r.length_m, estMinutes: r.est_minutes, estVolumeL: r.est_volume_l, ecoScore: r.eco_score },
+      spray: {
+        speed: r.speed, swath: r.swath, flow: r.flow, dose: r.dose, agent: r.agent,
+        flowPerSpeed: r.flow_per_speed, dutyCycle: r.duty_cycle,
+      },
+      plan: {
+        algo: r.algo, length: r.length_m, estMinutes: r.est_minutes,
+        estVolumeL: r.est_volume_l, ecoScore: r.eco_score,
+        savedVsUniformL: r.saved_vs_uniform_l,
+      },
       status: r.status, cells: JSON.parse(r.cell_ids || '[]'),
+      zoneId: r.zone_id ?? r.zone_name?.match(/^([A-Z])/)?.[1] ?? null,
+      zoneName: r.zone_name,
     }));
   }
 

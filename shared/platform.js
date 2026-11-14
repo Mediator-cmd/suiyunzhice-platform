@@ -88,6 +88,13 @@ export class Platform {
         cellSizeM: f.cellW, areaHa: f.totalAreaHa(),
         workableAreaHa: +f.workableAreaHa().toFixed(2),
         obstacles: f.obstacles,
+        // 管理分区（A~H）—— 与地图上的虚线分区、作业单里的 zoneId 完全同源
+        zoneCols: f.zoneCols, zoneRows: f.zoneRows,
+        zones: f.zones().map(z => ({
+          id: z.id, x: z.x, y: z.y, w: z.w, h: z.h,
+          areaHa: +z.areaHa.toFixed(3),
+          gridRange: z.gridRange,
+        })),
       },
       diseases: DISEASES,
       dimensions: ANALYTICS_DIMENSIONS,

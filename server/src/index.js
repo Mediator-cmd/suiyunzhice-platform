@@ -23,6 +23,7 @@ import {
   solveSprayRatio, generateSprayRoute, scoreRoute,
 } from '../../shared/planner.js';
 import { Simulator } from '../../shared/simulator.js';
+import { buildSprayMissions } from '../../shared/spraydispatch.js';
 import {
   DISEASES, ANALYTICS_DIMENSIONS, DEVICE_STATES, PLAN_OBJECTIVES, SPRAY_RATIO_NOTE,
 } from '../../shared/schema.js';
@@ -35,11 +36,12 @@ const DB_PATH = process.env.DB_PATH || join(ROOT, 'data', 'suiyun.db');
 const SIM = process.env.SIM !== '0';
 
 const store = new Store(DB_PATH);
-const analytics = new Analytics(store);
 
 // ---- 地块定义：天津宁河东棘坨镇示范田 ----
 const FIELD = defaultField();
 const platform = new Platform({ store, field: FIELD });
+
+const analytics = new Analytics(store, FIELD);
 
 const getPlan = (opts = {}) => platform.getPlan(opts);
 // ---- 实时中枢 ----
@@ -71,8 +73,36 @@ const hub = new RealtimeHub({
       store.insertMission(mission);
       broadcast('mission', mission);
     }
+    dispatchSprayIfNeeded();
   },
 });
+
+/**
+ * 自动派工：确诊病害在某个管理分区累积到阈值后，
+ * 生成带「飞行速度 × 喷洒速度」比例的靶向施药作业单。
+ * 与浏览器端共用 shared/spraydispatch.js，保证两端口径一致。
+ */
+let lastSprayDispatch = 0;
+function dispatchSprayIfNeeded() {
+  const now = Date.now();
+  if (now - lastSprayDispatch < 8000) return;   // 节流，避免刷屏
+  lastSprayDispatch = now;
+  try {
+    const built = buildSprayMissions({
+      field: FIELD,
+      dets: store.listDetections(500),
+      missions: store.listMissions(5000),
+      plan: getPlan().best,
+    });
+    for (const b of built) {
+      store.insertMission(b.mission);
+      broadcast('mission', b.mission);
+      broadcast('sprayPlan', { mission: b.mission, ratio: b.ratio });
+    }
+  } catch (e) {
+    console.error('[spray-dispatch]', e.message);
+  }
+}
 
 const linkage = new LinkageEngine({ store, onEvent: (e) => broadcast('linkage', e) });
 
@@ -253,6 +283,7 @@ if (SIM) {
           store.insertMission(mission);
           broadcast('mission', mission);
         }
+        dispatchSprayIfNeeded();
       } catch (e) {
         console.error('[detect]', e.message);
       }

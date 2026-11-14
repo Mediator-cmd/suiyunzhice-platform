@@ -11,7 +11,18 @@
 import { DISEASES, ANALYTICS_DIMENSIONS } from './schema.js';
 
 export class Analytics {
-  constructor(store) { this.store = store; }
+  constructor(store, field = null) {
+    this.store = store;
+    this.field = field;
+  }
+
+  /** 田块面积（ha）：优先用构造时传入的地块，否则回落到存储里的地块 */
+  fieldAreaHa() {
+    if (this.field?.totalAreaHa) return this.field.totalAreaHa();
+    const list = this.store.listFields?.() || [];
+    if (list.length) return list[0].areaHa ?? (list[0].widthM * list[0].heightM) / 10000;
+    return 0;
+  }
 
   /** 总览 KPI */
   overview() {
@@ -25,8 +36,8 @@ export class Analytics {
 
     // 植保效率提升（农户视角）
     // 对照基准：若对同一块地做整田均匀喷施
-    const fieldAreaHa = 2.0;                    // 示范田面积 ha
-    const traditionalVolume = fieldAreaHa * 12;  // L（12 L/ha 整田喷施）
+    const fieldAreaHa = this.fieldAreaHa();              // 示范田面积 ha
+    const traditionalVolume = fieldAreaHa * 12;          // L（12 L/ha 整田喷施）
     const preciseVolume = sprayed.reduce((a, m) => a + (m.plan?.estVolumeL || 0), 0);
     // 只有产生喷洒任务时才计算节约率，避免除零与虚假 100%
     const savedRatio = sprayed.length > 0 && traditionalVolume > 0

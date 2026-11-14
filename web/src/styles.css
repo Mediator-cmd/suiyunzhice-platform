@@ -84,21 +84,22 @@ a { color: var(--accent-2); text-decoration: none; }
 .nav { display: flex; flex-direction: column; gap: 8px; padding: 24px 16px; overflow: auto; }
 .nav button {
   width: 100%; text-align: left;
-  background: #ffffff; border: 1px solid transparent; color: #ffffff;
+  background: var(--ink-2); border: 1px solid #4d7075; color: #ffffff;
   padding: 12px 16px; cursor: pointer;
   font-size: 15px; font-family: inherit; font-weight: 700; white-space: nowrap;
   display: flex; align-items: center; gap: 8px;
-  transition: background .15s, color .15s;
+  transition: background .15s, color .15s, border-color .15s;
 }
 .nav button .idx {
   font-family: var(--mono); font-size: 12px; font-weight: 700;
   color: #9fb6b6; min-width: 16px;
 }
-.nav button:hover { background: var(--ink-2); color: #ffffff; }
+.nav button:hover { background: #4d7075; color: #ffffff; }
 .nav button.active {
   background: var(--accent-soft); color: var(--ink); border-color: var(--accent);
 }
 .nav button.active .idx { color: var(--accent); }
+.nav button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .side-foot {
   margin-top: auto; padding: 16px;
@@ -218,6 +219,25 @@ table.tbl td.num { font-family: var(--mono); font-variant-numeric: tabular-nums;
 .pill.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
 .pill.danger { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
 
+/* ---------- 能力行 / 事件行 ---------- */
+.cap-row {
+  display: flex; align-items: center; gap: 16px;
+  padding: 8px 8px; background: var(--panel-2); border: 1px solid var(--border);
+  cursor: pointer;
+}
+.cap-row:hover { border-color: var(--accent); background: var(--accent-soft); }
+.cap-art {
+  flex-shrink: 0; width: 40px; height: 40px;
+  background: #fff; border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+}
+.cap-body { display: flex; flex-direction: column; gap: 0; min-width: 0; flex: 1; }
+.cap-title { font-size: 14.5px; font-weight: 700; color: var(--text); }
+.cap-desc { font-size: 12.5px; font-weight: 600; color: var(--text); }
+.cap-go { font-size: 20px; font-weight: 700; color: var(--text); }
+
+.ev-row { border: 1px solid var(--border); padding: 8px; background: var(--panel-2); }
+
 /* ---------- 进度条 ---------- */
 .bar { height: 8px; background: var(--panel-2); overflow: hidden; border: 1px solid var(--border-soft); }
 .bar > i { display: block; height: 100%; background: var(--accent); }
@@ -252,6 +272,25 @@ table.tbl td.num { font-family: var(--mono); font-variant-numeric: tabular-nums;
   font-size: 17px !important;
 }
 .leaflet-bar a:hover { background: var(--panel-2) !important; color: var(--accent) !important; }
+
+/* ---------- 地图上的分区角标与设备图形 ---------- */
+.zone-label {
+  background: #ffffff; border: 1.5px solid #4f8a63; color: #1f5c38;
+  font-size: 12.5px; font-weight: 700; line-height: 16px; height: 16px;
+  padding: 0 4px; text-align: center; white-space: nowrap;
+}
+/* 正在作业的分区：黄色实线框 + 白底黄字 */
+.zone-label.active { border-color: #ca8a04; color: #8a6300; }
+.obstacle-label {
+  background: #304d50; border: 1.5px solid #304d50; color: #ffffff;
+  font-size: 12px; font-weight: 700; line-height: 16px; height: 16px;
+  padding: 0 4px; text-align: center; white-space: nowrap;
+}
+.dev-glyph { width: 36px; height: 36px; }
+.dev-glyph.uav { filter: drop-shadow(0 1px 3px rgba(28, 43, 34, .45)); }
+.dev-glyph.robot { filter: drop-shadow(0 1px 3px rgba(28, 43, 34, .45)); }
+.leaflet-marker-icon.zone-label-icon, .leaflet-marker-icon.obstacle-label-icon,
+.leaflet-marker-icon.dev-marker { background: none; border: none; }
 
 .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--text); font-weight: 700; }
 .legend i { display: inline-block; width: 12px; height: 12px; margin-right: 8px; vertical-align: -1px; }

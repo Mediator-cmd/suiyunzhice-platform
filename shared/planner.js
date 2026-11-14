@@ -17,7 +17,7 @@ import { PLAN_OBJECTIVES, SPRAY_RATIO_NOTE } from './schema.js';
 
 /** 田块：外接矩形 + 不作业障碍区（渠道、水塘、房舍） */
 export class Field {
-  constructor({ id, name, widthM, heightM, gridRows = 20, gridCols = 40, obstacles = [], soil = 'loam' }) {
+  constructor({ id, name, widthM, heightM, gridRows = 20, gridCols = 40, obstacles = [], soil = 'loam', zoneCols = 4, zoneRows = 2 }) {
     this.id = id;
     this.name = name;
     this.widthM = widthM;
@@ -26,11 +26,57 @@ export class Field {
     this.gridCols = gridCols;
     this.obstacles = obstacles;
     this.soil = soil;
+    /** 管理分区：把田块划成 zoneCols × zoneRows 个作业分区（A~H） */
+    this.zoneCols = zoneCols;
+    this.zoneRows = zoneRows;
   }
 
   get cellW() { return this.widthM / this.gridCols; }
   get cellH() { return this.heightM / this.gridRows; }
   get cellAreaHa() { return (this.cellW * this.cellH) / 10000; }
+
+  /** 管理分区的字母编号：A, B, C...（自西向东、自北向南） */
+  get zoneLetters() {
+    const out = [];
+    for (let i = 0; i < this.zoneCols * this.zoneRows; i++) {
+      out.push(String.fromCharCode(65 + (i % 26)));
+    }
+    return out;
+  }
+
+  /** 列出全部管理分区及其几何范围（与前端地图上的 A~H 划分一致） */
+  zones() {
+    const zw = this.widthM / this.zoneCols;
+    const zh = this.heightM / this.zoneRows;
+    const out = [];
+    for (let r = 0; r < this.zoneRows; r++) {
+      for (let c = 0; c < this.zoneCols; c++) {
+        const i = r * this.zoneCols + c;
+        const x = c * zw, y = r * zh;
+        // 分区内的网格列/行范围
+        const c0 = Math.floor((x / this.widthM) * this.gridCols);
+        const c1 = Math.ceil(((x + zw) / this.widthM) * this.gridCols);
+        const r0 = Math.floor((y / this.heightM) * this.gridRows);
+        const r1 = Math.ceil(((y + zh) / this.heightM) * this.gridRows);
+        out.push({
+          id: this.zoneLetters[i] || String(i + 1),
+          index: i, row: r, col: c,
+          x, y, w: zw, h: zh,
+          areaHa: (zw * zh) / 10000,
+          gridRange: { r0, r1, c0, c1 },
+        });
+      }
+    }
+    return out;
+  }
+
+  /** 某个网格属于哪个管理分区 */
+  zoneOfGrid(row, col) {
+    const c = Math.floor((col / this.gridCols) * this.zoneCols);
+    const r = Math.floor((row / this.gridRows) * this.zoneRows);
+    const i = r * this.zoneCols + c;
+    return this.zoneLetters[i] || String(i + 1);
+  }
 
   cellCenter(row, col) {
     return { x: (col + 0.5) * this.cellW, y: (row + 0.5) * this.cellH };
@@ -87,14 +133,67 @@ export function generateSprayRoute(field, {
   targetDoseLha = 12,
   mode = 'full',
   targetCells = null,
+  zoneId = null,
 } = {}) {
-  // 作业区域：全田 或 靶向网格
+  // 作业区域：全田 / 单个管理分区 / 靶向网格
   let region = { x0: 0, y0: 0, x1: field.widthM, y1: field.heightM };
   let regionAreaHa = field.totalAreaHa();
   let effectiveCells = null;
 
   const points = [];
   const legs = [];
+
+  // ---- 管理分区作业：只喷指定的 A~H 分区（如"仅处置 C 区"） ----
+  if (mode === 'zone' && zoneId) {
+    const zone = field.zones().find(z => z.id === zoneId);
+    if (!zone) throw new Error(`未知管理分区 ${zoneId}`);
+    region = { x0: zone.x, y0: zone.y, x1: zone.x + zone.w, y1: zone.y + zone.h };
+    regionAreaHa = zone.areaHa;
+    effectiveCells = { zone };
+
+    const regW = region.x1 - region.x0;
+    const regH = region.y1 - region.y0;
+    const horizontal = headingDeg % 180 === 0;
+    const alongLen = horizontal ? regW : regH;
+    const acrossLen = horizontal ? regH : regW;
+    const nLines = Math.max(1, Math.ceil(acrossLen / swathM));
+    const actualSpacing = acrossLen / nLines;
+
+    for (let i = 0; i < nLines; i++) {
+      const across = region.y0 + (i + 0.5) * actualSpacing;
+      const a = horizontal ? { x: region.x0, y: across } : { x: across, y: region.y0 };
+      const b = horizontal ? { x: region.x1, y: across } : { x: across, y: region.y1 };
+      const start = { x: a.x, y: a.y, z: altM, spd: speedMs, hdg: headingDeg, line: i, zone: zone.id };
+      const end = { x: b.x, y: b.y, z: altM, spd: speedMs, hdg: headingDeg + 180, line: i, zone: zone.id };
+      const seq = i % 2 === 0 ? [start, end] : [end, start];
+      points.push(...seq);
+      legs.push({ line: i, zone: zone.id, from: seq[0], to: seq[1], length: alongLen, spraySeconds: alongLen / speedMs });
+    }
+
+    const nTurns = Math.max(0, nLines - 1);
+    const turnLength = nTurns * (Math.PI * turnRadiusM);
+    const turnSeconds = nTurns * (Math.PI * turnRadiusM / speedMs) * 1.35;
+    const sprayLength = nLines * alongLen;
+    const coveredAreaHa = (nLines * actualSpacing * alongLen) / 10000;
+
+    return {
+      field: field.id, mode, zoneId: zone.id, swathM, headingDeg, speedMs, altM,
+      nLines, region, effectiveCells,
+      lineSpacing: actualSpacing,
+      overlapRatio: actualSpacing > swathM ? 1 - swathM / actualSpacing : 0,
+      points, legs,
+      regionAreaHa,
+      sprayLengthM: sprayLength,
+      totalLengthM: sprayLength + turnLength,
+      turningLengthM: turnLength,
+      turnSeconds,
+      spraySeconds: sprayLength / speedMs,
+      coveredAreaHa,
+      targetDoseLha,
+      targetCoverage: null,
+      spillAreaHa: 0,
+    };
+  }
 
   if (mode === 'target' && targetCells && targetCells.length) {
     const cw = field.cellW, ch = field.cellH;
@@ -556,6 +655,92 @@ function clusterCells(cells, cw, ch) {
   });
   clusters.forEach((c, i) => { c.id = i; });
   return clusters;
+}
+
+/**
+ * 生成一次「靶向施药」任务的完整参数。
+ *
+ * 老师关心的比例关系在这里落地成可下发的数字：
+ *   喷洒速度（流量）÷ 飞行速度 = 常数，即 flowPerSpeed，
+ *   变速飞行时喷阀按同一比例同步调流，保证单位面积药量恒定。
+ *
+ * 服务端（Node + SQLite）与浏览器（静态演示）共用本函数，
+ * 保证两边生成的作业单完全一致。
+ */
+export function buildSprayMission({
+  field, zoneId, headingDeg = 90, speedMs = 6, swathM = 1.0,
+  targetDoseLha = 12, disease = null, cells = [], agent = '戊唑醇·苯醚甲环唑',
+}) {
+  const route = generateSprayRoute(field, {
+    mode: 'zone', zoneId, headingDeg, speedMs, swathM, targetDoseLha,
+  });
+  const ratio = solveSprayRatio(route, { swathM, speedMs, targetDoseLha });
+  const score = scoreRoute(route, ratio);
+  const zone = field.zones().find(z => z.id === zoneId);
+
+  return {
+    route,
+    ratio,
+    score,
+    /** 作业单主体 */
+    mission: {
+      type: 'spray',
+      disease,
+      zoneId,
+      zoneName: `${zoneId} 区`,
+      target: {
+        grid: cells.length ? cells[0] : { row: zone.gridRange.r0, col: zone.gridRange.c0 },
+        cells,
+        zone: zoneId,
+      },
+      spray: {
+        speed: speedMs,               // 飞行速度 m/s
+        swath: swathM,                 // 喷幅 m
+        flow: ratio.requiredFlowLmin, // 喷洒速度（流量）L/min
+        dose: targetDoseLha,           // 目标施药量 L/ha
+        agent,                         // 药剂
+        // 速度-喷洒比例锁（核心不变量）
+        flowPerSpeed: ratio.flowPerSpeed,
+        dutyCycle: ratio.dutyCycle,
+        speedRange: ratio.speedRange,
+      },
+      plan: {
+        algo: '航向×速度×喷幅联合搜索（三目标打分）',
+        length: route.totalLengthM,
+        estMinutes: score.detail.totalMinutes,
+        estVolumeL: ratio.totalVolumeL,
+        ecoScore: score.eco,
+        zoneId,
+        // 相对整田均匀喷施的节药量
+        savedVsUniformL: round(
+          (field.totalAreaHa() * targetDoseLha) - ratio.totalVolumeL, 2),
+      },
+      status: 'pending',
+    },
+  };
+}
+
+/**
+ * 相对「整田均匀喷施」的药液节约率。
+ *
+ * 口径：整田均匀喷施 = 全田面积 × 目标施药量；
+ *       精准靶向 = 实际喷洒面积 × 目标施药量。
+ * 只有存在喷洒任务时才有意义，否则返回 null（平台显示「待作业」而非编造数字）。
+ */
+export function spraySavingRatio(missions, field, targetDoseLha = 12) {
+  const sprays = missions.filter(m => m.type === 'spray');
+  if (!sprays.length) return null;
+  const uniformL = field.totalAreaHa() * targetDoseLha;
+  if (uniformL <= 0) return null;
+  const preciseL = sprays.reduce((a, m) => a + (m.plan?.estVolumeL || 0), 0);
+  if (preciseL <= 0) return null;
+  return {
+    uniformL: round(uniformL, 2),
+    preciseL: round(preciseL, 2),
+    savedL: round(uniformL - preciseL, 2),
+    savedRatio: round(Math.max(0, (1 - preciseL / uniformL) * 100), 1),
+    sprayTasks: sprays.length,
+  };
 }
 
 function range(arr) {

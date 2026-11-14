@@ -1,13 +1,14 @@
 import React from 'react';
 import { FieldMap } from '../components/FieldMap.jsx';
 
-export default function Farm({ meta, briefing, detections, devices, events }) {
+export default function Farm({ meta, briefing, detections, devices, events, missions }) {
   if (!briefing) return <div className="empty">正在生成农户简报…</div>;
 
   const byDisease = new Map();
   for (const d of detections || []) {
     byDisease.set(d.disease, (byDisease.get(d.disease) || 0) + 1);
   }
+  const sprayMissions = (missions || []).filter(m => m.type === 'spray');
 
   return (
     <>
@@ -65,9 +66,37 @@ export default function Farm({ meta, briefing, detections, devices, events }) {
         </div>
       </div>
 
-      <div className="card pad0" style={{ overflow: 'hidden' }}>
+      <div className="card pad0" style={{ overflow: 'hidden', marginBottom: 12 }}>
         <div style={{ padding: '13px 15px 0' }}><h3>我的地块</h3></div>
-        <FieldMap field={meta?.field} devices={devices} detections={detections} events={events} height={380} />
+        <FieldMap field={meta?.field} devices={devices} detections={detections} events={events} missions={missions} height={380} />
+      </div>
+
+      <div className="card">
+        <h3>今日施药作业单 <span className="tag">{sprayMissions.length} 单</span></h3>
+        {sprayMissions.length === 0 ? (
+          <div className="empty">确诊病灶累积后自动派工，作业单会显示喷洒区、药剂与速度-喷洒比例</div>
+        ) : (
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>喷洒区</th><th>药剂</th><th className="right">飞行速度</th>
+                <th className="right">喷洒流量</th><th className="right">药耗</th><th className="right">节药</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sprayMissions.map(m => (
+                <tr key={m.missionId}>
+                  <td><b>{m.zoneName || `${m.zoneId} 区`}</b></td>
+                  <td className="xs">{m.spray?.agent}</td>
+                  <td className="num">{m.spray?.speed} m/s</td>
+                  <td className="num">{m.spray?.flow} L/min</td>
+                  <td className="num">{m.plan?.estVolumeL} L</td>
+                  <td className="num"><span className="green">−{m.plan?.savedVsUniformL} L</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </>
   );
