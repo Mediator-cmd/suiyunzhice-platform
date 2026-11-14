@@ -148,7 +148,7 @@ export default function Planning() {
         {CAPABILITY.map(c => (
           <div className="card" key={c.key}>
             <div className="row" style={{ marginBottom: 8 }}>
-              <b className="small" style={{ color: c.color, fontSize: 14 }}>{c.title}</b>
+              <b className="small" style={{ color: c.color, fontSize: 16 }}>{c.title}</b>
               <span className="spacer" />
               <span className="pill">{c.tag}</span>
             </div>
@@ -162,7 +162,7 @@ export default function Planning() {
                   borderRadius: 6, borderLeft: `2px solid ${c.color}`,
                 }}>
                   <div className="xs mute">{l}</div>
-                  <div className="mono" style={{ fontSize: 15, fontWeight: 600, color: c.color }}>{v}</div>
+                  <div className="mono" style={{ fontSize: 17, fontWeight: 700, color: c.color }}>{v}</div>
                 </div>
               ))}
             </div>
@@ -202,7 +202,7 @@ export default function Planning() {
           </p>
           <pre style={{
             background: 'var(--panel-2)', border: '1px solid var(--border)', borderRadius: 6,
-            padding: 12, overflow: 'auto', fontSize: 11.5, lineHeight: 1.6, margin: 0,
+            padding: 12, overflow: 'auto', fontSize: 13, lineHeight: 1.7, margin: 0,
             color: 'var(--text)',
           }} className="mono">{DEVICE_PROTO}</pre>
         </div>

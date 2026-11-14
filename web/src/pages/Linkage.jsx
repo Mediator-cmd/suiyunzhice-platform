@@ -78,7 +78,7 @@ export default function Linkage({ meta, devices, detections, events, overview })
               <div className="row" style={{ gap: 7, marginBottom: 4 }}>
                 <span style={{
                   width: 20, height: 20, borderRadius: '50%', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', fontSize: 11,
+                  alignItems: 'center', justifyContent: 'center', fontSize: 12.5,
                   background: 'var(--bg)', border: '1px solid var(--accent-2)', color: 'var(--accent-2)',
                 }}>{i + 1}</span>
                 <b className="small">{s.label}</b>
@@ -144,7 +144,7 @@ export default function Linkage({ meta, devices, detections, events, overview })
               ].map(([label, val, unit, desc, cls]) => (
                 <div key={label} style={{ padding: '9px 11px', background: 'var(--panel-2)', borderRadius: 6 }}>
                   <div className="xs dim">{label}</div>
-                  <div className={`value ${cls}`} style={{ fontSize: 21 }}>
+                  <div className={`value ${cls}`} style={{ fontSize: 25 }}>
                     {val >= 1000 ? (val / 1000).toFixed(1) : val}<span className="xs mute"> {val >= 1000 ? 's' : unit}</span>
                   </div>
                   <div className="xs mute" style={{ marginTop: 3 }}>{desc}</div>
@@ -220,9 +220,9 @@ function LatencyChart({ data }) {
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} stackOffset="none">
         <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" />
-        <XAxis dataKey="time" stroke={CHART.axis} tick={{ fontSize: 10 }} minTickGap={40} />
-        <YAxis stroke={CHART.axis} tick={{ fontSize: 10 }} unit=" ms" width={62} />
-        <RTooltip contentStyle={{ background: CHART.tooltipBg, border: `1px solid ${CHART.tooltipBorder}`, fontSize: 12 }} />
+        <XAxis dataKey="time" stroke={CHART.axis} tick={{ fontSize: 12.5 }} minTickGap={40} />
+        <YAxis stroke={CHART.axis} tick={{ fontSize: 12.5 }} unit=" ms" width={70} />
+        <RTooltip contentStyle={{ background: CHART.tooltipBg, border: `1px solid ${CHART.tooltipBorder}`, fontSize: 13.5 }} />
         <Bar dataKey="感知决策" stackId="a" fill={CHART.green} />
         <Bar dataKey="决策下发" stackId="a" fill={CHART.blue} />
         <Bar dataKey="执行到位" stackId="a" fill={CHART.amber} />

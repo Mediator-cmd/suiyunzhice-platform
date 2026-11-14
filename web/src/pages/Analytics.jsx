@@ -158,10 +158,10 @@ function TemporalView({ data }) {
         <ResponsiveContainer width="100%" height={260}>
           <AreaChart data={data.rows || []}>
             <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" />
-            <XAxis dataKey="day" stroke={CHART.axis} tick={{ fontSize: 10 }} />
-            <YAxis stroke={CHART.axis} tick={{ fontSize: 10 }} />
-            <RTooltip contentStyle={{ background: CHART.tooltipBg, border: `1px solid ${CHART.tooltipBorder}`, fontSize: 12 }} />
-            <Legend wrapperStyle={{ fontSize: 11.5 }} />
+            <XAxis dataKey="day" stroke={CHART.axis} tick={{ fontSize: 12.5 }} />
+            <YAxis stroke={CHART.axis} tick={{ fontSize: 12.5 }} />
+            <RTooltip contentStyle={{ background: CHART.tooltipBg, border: `1px solid ${CHART.tooltipBorder}`, fontSize: 13.5 }} />
+            <Legend wrapperStyle={{ fontSize: 13 }} />
             <Area type="monotone" dataKey="count" name="检出量" stroke={CHART.blue} fill={CHART.blue} fillOpacity={0.22} />
             <Area type="monotone" dataKey="sprays" name="施药任务数" stroke={CHART.green} fill={CHART.green} fillOpacity={0.16} />
           </AreaChart>
@@ -201,8 +201,8 @@ function DiseaseView({ data }) {
               <Pie data={pie} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={78} innerRadius={42}>
                 {pie.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
               </Pie>
-              <RTooltip contentStyle={{ background: CHART.tooltipBg, border: `1px solid ${CHART.tooltipBorder}`, fontSize: 12 }} />
-              <Legend wrapperStyle={{ fontSize: 11.5 }} />
+              <RTooltip contentStyle={{ background: CHART.tooltipBg, border: `1px solid ${CHART.tooltipBorder}`, fontSize: 13.5 }} />
+              <Legend wrapperStyle={{ fontSize: 13 }} />
             </PieChart>
           </ResponsiveContainer>
         )}
@@ -235,11 +235,11 @@ function PlatformView({ data }) {
       {(data.rows || []).map(r => (
         <div className="card" key={r.kind}>
           <div className="row" style={{ marginBottom: 7 }}>
-            <span className={`pill ${r.kind}`} style={{ fontSize: 12.5, padding: '3px 11px' }}>
+            <span className={`pill ${r.kind}`} style={{ fontSize: 13.5, padding: '3px 12px' }}>
               {r.kind === 'uav' ? '植保无人机' : '地面监测机器人'}
             </span>
             <span className="spacer" />
-            <span className="mono" style={{ fontSize: 21, color: r.kind === 'uav' ? 'var(--uav)' : 'var(--robot)' }}>
+            <span className="mono" style={{ fontSize: 25, color: r.kind === 'uav' ? 'var(--uav)' : 'var(--robot)' }}>
               {r.count}
             </span>
           </div>
@@ -329,11 +329,11 @@ function EnvironmentView({ data }) {
         <ResponsiveContainer width="100%" height={240}>
           <BarChart data={data.rows || []}>
             <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" />
-            <XAxis dataKey="label" stroke={CHART.axis} tick={{ fontSize: 10 }} />
-            <YAxis yAxisId="l" stroke={CHART.axis} tick={{ fontSize: 10 }} />
-            <YAxis yAxisId="r" orientation="right" stroke={CHART.axis} tick={{ fontSize: 10 }} domain={[0, 1]} />
-            <RTooltip contentStyle={{ background: CHART.tooltipBg, border: `1px solid ${CHART.tooltipBorder}`, fontSize: 12 }} />
-            <Legend wrapperStyle={{ fontSize: 11.5 }} />
+            <XAxis dataKey="label" stroke={CHART.axis} tick={{ fontSize: 12.5 }} />
+            <YAxis yAxisId="l" stroke={CHART.axis} tick={{ fontSize: 12.5 }} />
+            <YAxis yAxisId="r" orientation="right" stroke={CHART.axis} tick={{ fontSize: 12.5 }} domain={[0, 1]} />
+            <RTooltip contentStyle={{ background: CHART.tooltipBg, border: `1px solid ${CHART.tooltipBorder}`, fontSize: 13.5 }} />
+            <Legend wrapperStyle={{ fontSize: 13 }} />
             <Bar yAxisId="l" dataKey="count" name="检出量" fill={CHART.blue} />
             <Line yAxisId="r" dataKey="avgConfidence" name="平均置信度" stroke={CHART.green} strokeWidth={2} />
           </BarChart>

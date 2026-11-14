@@ -144,7 +144,7 @@ export default function Planner({ meta }) {
                 ].map(([l, v, c]) => (
                   <div className="kpi" key={l}>
                     <span className="label">{l}</span>
-                    <span className="value" style={{ fontSize: 20, color: c }}>{v}</span>
+                    <span className="value" style={{ fontSize: 24, color: c }}>{v}</span>
                   </div>
                 ))}
               </div>
@@ -171,7 +171,7 @@ export default function Planner({ meta }) {
                 ].map(([l, v]) => (
                   <div className="kpi" key={l}>
                     <span className="label">{l}</span>
-                    <span className="mono" style={{ fontSize: 15 }}>{v}</span>
+                    <span className="mono" style={{ fontSize: 17 }}>{v}</span>
                   </div>
                 ))}
               </div>
@@ -234,22 +234,22 @@ export default function Planner({ meta }) {
               <div className="grid g4" style={{ marginBottom: 11 }}>
                 <div className="kpi">
                   <span className="label">所需流量</span>
-                  <span className="value green" style={{ fontSize: 21 }}>{ratio.requiredFlowLmin}<span className="xs mute"> L/min</span></span>
+                  <span className="value green" style={{ fontSize: 25 }}>{ratio.requiredFlowLmin}<span className="xs mute"> L/min</span></span>
                   <span className="sub">喷头能力上限 {ratio.maxFlowLmin} L/min</span>
                 </div>
                 <div className="kpi">
                   <span className="label">喷头开度</span>
-                  <span className="value" style={{ fontSize: 21 }}>{(ratio.dutyCycle * 100).toFixed(0)}<span className="xs mute"> %</span></span>
+                  <span className="value" style={{ fontSize: 25 }}>{(ratio.dutyCycle * 100).toFixed(0)}<span className="xs mute"> %</span></span>
                   <span className="sub">{ratio.feasible ? '流量在能力范围内' : '超出喷头能力！'}</span>
                 </div>
                 <div className="kpi">
                   <span className="label">流量/速度比</span>
-                  <span className="value blue" style={{ fontSize: 21 }}>{ratio.flowPerSpeed}<span className="xs mute"> L/(m·min)</span></span>
+                  <span className="value blue" style={{ fontSize: 25 }}>{ratio.flowPerSpeed}<span className="xs mute"> L/(m·min)</span></span>
                   <span className="sub">该比值恒定，比例自动锁定</span>
                 </div>
                 <div className="kpi">
                   <span className="label">可行速度区间</span>
-                  <span className="value amber" style={{ fontSize: 21 }}>
+                  <span className="value amber" style={{ fontSize: 25 }}>
                     {ratio.speedRange ? `${ratio.speedRange.min}~${ratio.speedRange.max}` : '—'}<span className="xs mute"> m/s</span></span>
                   <span className="sub">保证不漏喷、不超喷</span>
                 </div>

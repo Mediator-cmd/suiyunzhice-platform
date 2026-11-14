@@ -76,7 +76,7 @@ export default function Overview({ meta, devices, telemetry, detections, events,
                 ['④ 自动路径规划', '航向/速度/喷幅联合搜索，自动求解速度-喷洒比例，按经济/快速/环保三目标打分。', 'onNav', 'planner'],
               ].map(([t, d, _, id]) => (
                 <div key={t} style={{ cursor: 'pointer' }} onClick={() => onNav(id)}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent-2)' }}>{t}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent-2)' }}>{t}</div>
                   <div className="small dim" style={{ marginTop: 2 }}>{d}</div>
                 </div>
               ))}
@@ -122,7 +122,7 @@ export default function Overview({ meta, devices, telemetry, detections, events,
             {briefing.kpis.map(k => (
               <div className="kpi" key={k.label}>
                 <span className="label">{k.label}</span>
-                <span className="value" style={{ fontSize: 21 }}>{k.value}</span>
+                <span className="value" style={{ fontSize: 25 }}>{k.value}</span>
                 <span className="sub">{k.sub}</span>
               </div>
             ))}

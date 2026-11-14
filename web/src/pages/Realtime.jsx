@@ -96,15 +96,15 @@ export default function Realtime({ meta, devices, telemetry, linkMetrics, mode }
             <div className="grid g3" style={{ gap: 8 }}>
               <div className="kpi">
                 <span className="label">平均时延</span>
-                <span className="value green" style={{ fontSize: 19 }}>{m.avg}<span className="xs mute"> ms</span></span>
+                <span className="value green" style={{ fontSize: 23 }}>{m.avg}<span className="xs mute"> ms</span></span>
               </div>
               <div className="kpi">
                 <span className="label">P95</span>
-                <span className="value" style={{ fontSize: 19 }}>{m.p95}<span className="xs mute"> ms</span></span>
+                <span className="value" style={{ fontSize: 23 }}>{m.p95}<span className="xs mute"> ms</span></span>
               </div>
               <div className="kpi">
                 <span className="label">丢包率</span>
-                <span className={`value ${Number(m.loss) < 1 ? 'green' : 'amber'}`} style={{ fontSize: 19 }}>{m.loss}<span className="xs mute"> %</span></span>
+                <span className={`value ${Number(m.loss) < 1 ? 'green' : 'amber'}`} style={{ fontSize: 23 }}>{m.loss}<span className="xs mute"> %</span></span>
               </div>
             </div>
             <div className="xs mute" style={{ marginTop: 8 }}>
@@ -133,10 +133,10 @@ export default function Realtime({ meta, devices, telemetry, linkMetrics, mode }
           <ResponsiveContainer width="100%" height={230}>
             <LineChart data={series}>
               <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" />
-              <XAxis dataKey="time" stroke={CHART.axis} tick={{ fontSize: 10 }} minTickGap={40} />
-              <YAxis stroke={CHART.axis} tick={{ fontSize: 10 }} unit=" ms" width={58} />
-              <RTooltip contentStyle={{ background: CHART.tooltipBg, border: `1px solid ${CHART.tooltipBorder}`, fontSize: 12 }} />
-              <Legend wrapperStyle={{ fontSize: 11.5 }} />
+              <XAxis dataKey="time" stroke={CHART.axis} tick={{ fontSize: 12.5 }} minTickGap={40} />
+              <YAxis stroke={CHART.axis} tick={{ fontSize: 12.5 }} unit=" ms" width={66} />
+              <RTooltip contentStyle={{ background: CHART.tooltipBg, border: `1px solid ${CHART.tooltipBorder}`, fontSize: 13.5 }} />
+              <Legend wrapperStyle={{ fontSize: 13 }} />
               <Line type="monotone" dataKey="latency" name="端到端时延(ms)" stroke={CHART.green} dot={false} strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>

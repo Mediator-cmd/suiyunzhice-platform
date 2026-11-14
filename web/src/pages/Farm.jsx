@@ -27,7 +27,7 @@ export default function Farm({ meta, briefing, detections, devices, events }) {
           {briefing.kpis.map(k => (
             <div className="kpi" key={k.label}>
               <span className="label">{k.label}</span>
-              <span className="value green" style={{ fontSize: 22 }}>{k.value}</span>
+              <span className="value green" style={{ fontSize: 26 }}>{k.value}</span>
               <span className="sub">{k.sub}</span>
             </div>
           ))}

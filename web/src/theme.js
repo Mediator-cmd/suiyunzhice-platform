@@ -7,15 +7,15 @@
 
 export const CHART = {
   /** 坐标轴与网格线 */
-  axis: '#7b8a80',
+  axis: '#7b8f95',
   grid: '#e3eae4',
   /** 图表内 tooltip */
   tooltipBg: '#ffffff',
-  tooltipBorder: '#d5e0d7',
-  tooltipText: '#1c2b22',
+  tooltipBorder: '#d5dee0',
+  tooltipText: '#21353a',
   /** 数据系列 */
   series: [
-    '#16a34a', // 绿 —— 主色
+    '#0f9d63', // 绿 —— 主色
     '#0284c7', // 天蓝
     '#7c3aed', // 紫
     '#d97706', // 琥珀
@@ -24,11 +24,12 @@ export const CHART = {
     '#db2777', // 玫红
   ],
   /** 语义色 */
-  green: '#16a34a',
+  green: '#0f9d63',
   blue: '#0284c7',
   amber: '#d97706',
   red: '#dc2626',
   purple: '#7c3aed',
+  ink: '#304d50',
 };
 
 export const MAP = {
@@ -39,10 +40,10 @@ export const MAP = {
   obstacleFill: '#ede9fe',
   obstacleStroke: '#8b5cf6',
   /** 航线 */
-  route: '#16a34a',
+  route: '#0f9d63',
   routeManual: '#d97706',
   /** 背景 */
-  bg: '#f6f9f6',
+  bg: '#f1f5f6',
 };
 
 /** 病害配色（浅色背景下加深，保证可读） */
