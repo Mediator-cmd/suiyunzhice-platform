@@ -1,0 +1,11 @@
+import { chromium } from 'playwright-core';
+const EXE = 'C:/Users/ASUS/AppData/Local/ms-playwright/chromium-1208/chrome-win64/chrome.exe';
+const browser = await chromium.launch({ executablePath: EXE });
+const page = await browser.newPage();
+const bad = [];
+page.on('response', r => { if (r.status() >= 400) bad.push(`${r.status()} ${r.url()}`); });
+page.on('requestfailed', r => bad.push(`FAIL ${r.url()} ${r.failure()?.errorText}`));
+await page.goto('http://localhost:4173/', { waitUntil: 'load' });
+await page.waitForTimeout(6000);
+console.log(bad.join('\n') || '(no failed requests)');
+await browser.close();

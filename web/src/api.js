@@ -35,6 +35,44 @@ async function get(path) {
   return res.json();
 }
 
+/**
+ * 后端可用性探测
+ *
+ * 纯静态部署（GitHub Pages）没有 /api 与 /ws。如果每次请求都去试一遍，
+ * 浏览器控制台会刷出一堆 404。这里做三件事：
+ *   1. 已知静态托管域名直接判定为「无后端」，一次网络请求都不发；
+ *   2. 其余情况只探测一次，并把进行中的探测 promise 缓存起来，
+ *      避免首屏并发请求同时发起多次探测；
+ *   3. 探测失败后全部走本地引擎，不再发起任何网络请求。
+ */
+let backendState = null;      // null=未探测, true=可用, false=不可用
+let backendProbe = null;      // 进行中的探测 promise
+
+function isKnownStaticHost() {
+  const h = window.location.hostname;
+  return h.endsWith('.github.io') || h.endsWith('.github.dev');
+}
+
+async function probeBackend() {
+  if (backendState !== null) return backendState;
+  if (isKnownStaticHost()) { backendState = false; return false; }
+  if (!backendProbe) {
+    backendProbe = (async () => {
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 2500);
+        const res = await fetch(`${API_BASE}/api/meta`, { signal: ctrl.signal });
+        clearTimeout(timer);
+        backendState = res.ok;
+      } catch {
+        backendState = false;
+      }
+      return backendState;
+    })();
+  }
+  return backendProbe;
+}
+
 /* =====================================================================
  * 浏览器内引擎 —— 与服务端共享 shared/ 下的同一套逻辑
  * ===================================================================== */
@@ -151,6 +189,7 @@ export function getLocalEngine() {
  * ===================================================================== */
 
 async function withFallback(fn, localFn) {
+  if (!(await probeBackend())) return localFn();
   try {
     return await fn();
   } catch {
@@ -198,6 +237,7 @@ function parsePlanQuery(q) {
 
 export async function post(path, body) {
   try {
+    if (!(await probeBackend())) throw new Error('no backend');
     const res = await fetch(`${API_BASE}/api${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -281,26 +321,13 @@ export function subscribe(handlers) {
     setTimeout(connect, 1000 * retry);
   };
 
-  // 先试一次真实连接，失败后回落到本地引擎
-  try {
-    ws = new WebSocket(`${WS_BASE}/ws/live`);
-    ws.onopen = () => { retry = 0; handlers.onStatus?.(MODE.LIVE); };
-    ws.onmessage = (ev) => {
-      let msg;
-      try { msg = JSON.parse(ev.data); } catch { return; }
-      handlers.onMessage?.(msg.type, msg.payload, msg.ts);
-    };
-    ws.onclose = () => {
-      if (closed) return;
-      handlers.onStatus?.(MODE.MOCK);
-      startLocal();
-      scheduleRetry();
-    };
-    ws.onerror = () => { try { ws.close(); } catch { /* ignore */ } };
-  } catch {
-    startLocal();
-    scheduleRetry();
-  }
+  // 先探测后端：有则走 WebSocket，无则直接用本地引擎，
+  // 避免在纯静态托管环境里反复触发 404 的握手失败。
+  probeBackend().then(ok => {
+    if (closed) return;
+    if (ok) connect();
+    else { startLocal(); handlers.onStatus?.(MODE.MOCK); }
+  });
 
   return () => {
     closed = true;
