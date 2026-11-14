@@ -28,6 +28,13 @@ export default function Overview({ meta, devices, telemetry, detections, events,
           面向小麦病害防控的空地协同精准施药系统。植保无人机负责空中广域巡查，地面监测机器人负责近距复核，
           云端平台完成数据接入、实时决策、多维分析与作业下发，形成「监测—决策—执行—反馈」闭环。
         </p>
+        <p style={{ marginTop: 6 }}>
+          公网访问地址：
+          <a className="mono blue" href="https://Mediator-cmd.github.io/maitian-platform/"
+            target="_blank" rel="noreferrer">
+            https://Mediator-cmd.github.io/maitian-platform/
+          </a>
+        </p>
       </div>
 
       {/* KPI */}

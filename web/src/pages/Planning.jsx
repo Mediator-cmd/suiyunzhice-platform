@@ -7,17 +7,18 @@ const OPTIONS = [
     badge: '免费 · 免登录 · 永久',
     cost: '0 元',
     time: '约 10 分钟',
+    live: 'https://Mediator-cmd.github.io/maitian-platform/',
     detail: [
-      '前端是纯静态站，直接推到 GitHub 仓库的 gh-pages 分支，GitHub 自动分配 https://<用户名>.github.io/<仓库名>/ 地址，任何人可访问。',
-      '平台内置浏览器端模拟器，因此即使后端未部署，页面也能完整演示全部功能与数据。',
-      '后续部署真实后端时，只需在页面顶部的环境变量里把 API/WS 地址指向服务器，前端无需重新打包逻辑。',
+      '前端是纯静态站，平台内核直接跑在浏览器里，因此即使后端未部署，全部 8 个页面（含路径规划与速度-喷洒比例求解）依然完整可用。',
+      '已部署并验证：https://Mediator-cmd.github.io/maitian-platform/ —— 任何人可访问，无需登录、无需备案。',
+      '后续部署真实后端时，只需把 API/WS 地址指向服务器，前端无需改动逻辑（VITE_API_BASE / VITE_WS_BASE）。',
     ],
     steps: [
-      '把 web/dist 推到 gh-pages 分支',
-      '仓库 Settings → Pages → Source 选择 gh-pages 分支',
-      '1–2 分钟后访问 https://Mediator-cmd.github.io/maitian-platform/',
+      '推送 main 分支，.github/workflows/pages.yml 自动构建并发布',
+      '仓库 Settings → Pages → Source 选择 workflow',
+      '访问 https://Mediator-cmd.github.io/maitian-platform/',
     ],
-    limits: ['演示态数据来自浏览器模拟器，非真实设备'],
+    limits: ['演示态数据来自浏览器模拟器，非真实设备', '刷新页面数据重置'],
     recommended: true,
   },
   {
@@ -72,6 +73,28 @@ export default function Planning() {
           目标是拿到一个「所有人都能打开」的网址。本页给出三套方案，按「拿到链接的速度」与「数据真实性」两个维度取不同平衡点。
           推荐路径是：先用 GitHub Pages 拿到可提交、可演示的公网地址，再用 Docker + Tunnel 承接真实设备数据。
         </p>
+      </div>
+
+      <div className="card" style={{
+        marginBottom: 12,
+        borderColor: 'rgba(74,222,128,.45)',
+        background: 'linear-gradient(90deg,rgba(74,222,128,.10),rgba(74,222,128,.02))',
+      }}>
+        <div className="row wrap" style={{ gap: 10 }}>
+          <span className="pill ok">已上线</span>
+          <b className="small">公网访问地址</b>
+          <a className="mono blue" href="https://Mediator-cmd.github.io/maitian-platform/"
+            target="_blank" rel="noreferrer"
+            style={{ fontSize: 15, wordBreak: 'break-all' }}>
+            https://Mediator-cmd.github.io/maitian-platform/
+          </a>
+          <span className="spacer" />
+          <span className="xs mute">任何人可访问 · 无需登录 · 免备案 · 永久有效</span>
+        </div>
+        <div className="xs dim" style={{ marginTop: 7 }}>
+          该地址由 GitHub Pages 承载，平台内核（路径规划、速度-喷洒比例求解、六维统计、空地联动）
+          直接运行在浏览器中，因此无后端时功能依然完整；接入真实设备后改为实时接入模式。
+        </div>
       </div>
 
       <div className="grid g3" style={{ marginBottom: 12 }}>
