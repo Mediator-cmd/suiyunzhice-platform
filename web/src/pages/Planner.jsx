@@ -60,20 +60,12 @@ export default function Planner({ meta }) {
     <>
       <div className="page-head">
         <h2>路径规划 · 自动规划替代人工手画</h2>
-        <p>
-          现状是植保航线的航向、速度、转弯全靠飞手在地面站手动画，既慢又不可复现。
-          平台的做法是：把「怎么飞」变成一个可搜索的优化问题 —— 航向、速度、喷幅三维联合搜索，
-          以航程、能耗、药耗、重喷率为目标函数，按经济 / 快速 / 环保三档权重出解，
-          并同步求解飞行速度与喷洒流量的比例关系。
-        </p>
+        <p>航向×速度×喷幅三维联合搜索，按经济 / 快速 / 环保三档权重出解，并同步求解速度-喷洒比例。</p>
       </div>
 
       <div className="card" style={{ marginBottom: 12 }}>
         <h3>作业模式</h3>
-        <p className="hint">
-          喷幅决定喷洒效率，也决定"药打在哪里"。整机喷幅用于全田覆盖作业，1m 窄幅用于靶向点喷——
-          后者正是本系统"只打有病的地方"的硬件基础。
-        </p>
+        <p className="hint">整机喷幅用于全田覆盖，1m 窄幅用于靶向点喷。</p>
         <div className="grid g2">
           {[
             ['full', '全田覆盖作业', '整机喷幅 4–7m 连续往返，覆盖全部可作业面积。适用于病害初发、尚未成片的田块。', 'var(--accent-2)'],
@@ -82,7 +74,7 @@ export default function Planner({ meta }) {
             <div key={k}
               onClick={() => { setMode(k); setSwath(k === 'target' ? 1.0 : 5.0); }}
               style={{
-                padding: '12px 14px', borderRadius: 8, cursor: 'pointer',
+                padding: '16px', cursor: 'pointer',
                 background: 'var(--panel-2)',
                 border: `1px solid ${mode === k ? color : 'var(--border)'}`,
                 boxShadow: mode === k ? `0 0 0 1px ${color}` : 'none',
@@ -107,7 +99,7 @@ export default function Planner({ meta }) {
             {[
               ['economy', '最经济', '航时+药耗+电耗', 'var(--accent)'],
               ['speed', '最快速', '航程+转弯次数', 'var(--accent-2)'],
-              ['eco', '最环保', '重喷率+越界药量', 'var(--robot)'],
+              ['eco', '最环保', '重喷率+越界药量', 'var(--warn)'],
             ].map(([k, name, metric, color]) => (
               <div key={k}>
                 <div className="weight-row">
@@ -152,7 +144,7 @@ export default function Planner({ meta }) {
                 {[
                   ['经济得分', best.score.economy, 'var(--accent)'],
                   ['快速得分', best.score.speed, 'var(--accent-2)'],
-                  ['环保得分', best.score.eco, 'var(--robot)'],
+                  ['环保得分', best.score.eco, 'var(--warn)'],
                 ].map(([l, v, c]) => (
                   <div key={l}>
                     <div className="row"><span className="xs dim">{l}</span><span className="spacer" /><span className="xs mono">{v}</span></div>
@@ -201,10 +193,7 @@ export default function Planner({ meta }) {
       <div className="grid g-2-1" style={{ marginBottom: 12 }}>
         <div className="card">
           <h3>速度 — 喷洒比例求解器</h3>
-          <p className="hint">
-            喷头流量必须与「前进速度 × 喷幅」严格成正比：飞行加速必须同比加大流量，否则药液沉积不足（漏喷）；
-            减速则需同比减小流量，否则超喷与药害。平台自动求解该比例，并给出不漏喷/不超喷的可行速度区间。
-          </p>
+          <p className="hint">流量须与「速度 × 喷幅」严格成正比；平台自动求解比例并给出不漏喷、不超喷的可行速度区间。</p>
           <div className="grid g3" style={{ marginBottom: 12 }}>
             <div>
               <label className="lbl">飞行速度 (m/s)</label>
@@ -256,7 +245,7 @@ export default function Planner({ meta }) {
               </div>
               {!ratio.feasible && (
                 <div className="conclusion" style={{ background: 'var(--danger-soft)', borderColor: 'var(--danger)' }}>
-                  <b>当前参数超出喷头能力</b>：需降低速度、减小喷幅或降低目标施药量。平台会在下发任务前自动拦截这类不合法参数。
+                  <b>当前参数超出喷头能力</b>：需降低速度、减小喷幅或降低目标施药量，平台会在下发前自动拦截。
                 </div>
               )}
               <div className="xs mute" style={{ marginTop: 9 }}>
@@ -306,7 +295,7 @@ export default function Planner({ meta }) {
       {plan?.candidates?.length > 0 && (
         <div className="card">
           <h3>搜索候选解排行 <span className="tag">航向 × 速度 × 喷幅 联合搜索</span></h3>
-          <p className="hint">平台遍历全部可行组合并按当前权重排序，可直接下发排名第一的解，也可由操作员人工改写后复核。</p>
+          <p className="hint">遍历全部可行组合并按当前权重排序，第一名可直接下发。</p>
           <div className="table-scroll" style={{ maxHeight: 300 }}>
             <table className="tbl">
               <thead><tr>

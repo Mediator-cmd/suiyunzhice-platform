@@ -27,7 +27,7 @@ const FLOW_STAGES = [
   },
   {
     key: 'transport',
-    color: 'var(--accent-2)',
+    color: 'var(--warn)',
     title: '传输层',
     subtitle: '三通道冗余',
     icons: [IconSocket, IconBatch, IconBroker],
@@ -68,11 +68,7 @@ export default function Architecture() {
     <>
       <div className="page-head">
         <h2>系统架构 · 空地协同植保云平台</h2>
-        <p>
-          下图是平台完整作业场景：无人机在空中巡检并靶向喷洒，地面机器人在田间近距复核，
-          云端在两者之间做可信裁决。核心变化在于把原来分散在四个软件著作权中的功能统一到
-          同一份数据契约之下，形成可扩展的云端服务，而不是四个互不相通的工具。
-        </p>
+        <p>无人机空中巡检、地面机器人近距复核、云端居中裁决与下发，四类功能统一在同一份数据契约之下。</p>
       </div>
 
       {/* ============ 场景总图 ============ */}
@@ -81,10 +77,7 @@ export default function Architecture() {
           作业场景总图
           <span className="tag">示意图 · 非实拍</span>
         </h3>
-        <p className="hint">
-          一眼可读的三方协同：<b>无人机</b>负责空中广度与速度，<b>机器人</b>负责地面深度与确定性，
-          <b>云端</b>负责裁决与下发，虚线箭头即真实数据流向。
-        </p>
+        <p className="hint">虚线箭头即真实数据流向：上行采集，下行任务。</p>
         <SceneDiagram />
       </div>
 
@@ -94,10 +87,7 @@ export default function Architecture() {
           平台流程图
           <span className="tag">数据自下而上，逐层收敛</span>
         </h3>
-        <p className="hint">
-          设备采集 → 冗余传输 → 云端内核裁决 → 面向角色的服务输出。
-          每一层都有明确职责与可量化的指标，不存在「数据上来以后没人用」的环节。
-        </p>
+        <p className="hint">设备采集 → 冗余传输 → 云端内核裁决 → 面向角色的服务输出。</p>
 
         <div className="flow">
           {FLOW_STAGES.map((stage, i) => (
@@ -143,10 +133,7 @@ export default function Architecture() {
           空地联动闭环
           <span className="tag">五步 · 每步时延可追溯</span>
         </h3>
-        <p className="hint">
-          这条链就是老师问的「三者实时联动」的具体实现。判据写在云端：置信度低于 75%、
-          或病位在叶下/根茎/土壤、或病种为赤霉病与根腐病 → 派单机器人复核；否则直接生成喷洒任务。
-        </p>
+        <p className="hint">判据写在云端：置信度低于 75%、病位在叶下/根茎/土壤、或赤霉病与根腐病 → 派单机器人复核；否则直接生成喷洒任务。</p>
         <div className="loop">
           {LOOP_STEPS.map((s, i) => (
             <React.Fragment key={s.label}>
@@ -185,10 +172,7 @@ export default function Architecture() {
       <div className="grid g2" style={{ marginTop: 14 }}>
         <div className="card">
           <h3>数据契约 <span className="tag">三端共用</span></h3>
-          <p className="hint">
-            平台稳定性的前提是「字段定义只有一处」。遥测帧、识别结果、作业任务、联动事件四类消息
-            在 shared/schema.js 中集中定义，设备端、云端、前端引用同一份，避免字段漂移。
-          </p>
+          <p className="hint">四类消息在 shared/schema.js 中集中定义，三端引用同一份，避免字段漂移。</p>
           <table className="tbl">
             <thead><tr><th>消息</th><th>方向</th><th>关键字段</th></tr></thead>
             <tbody>

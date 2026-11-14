@@ -128,7 +128,7 @@ export function FieldMap({
               className: 'dev-marker',
               html: `<div style="
                 width:16px;height:16px;border-radius:50%;
-                background:${d.kind === 'uav' ? '#0284c7' : '#7c3aed'};
+                background:${d.kind === 'uav' ? '#0284c7' : '#b91c1c'};
                 border:2px solid #ffffff; box-shadow:0 1px 4px rgba(28,43,34,.35);
               "></div>`,
               iconSize: [16, 16], iconAnchor: [8, 8],

@@ -25,10 +25,7 @@ export default function Overview({ meta, devices, telemetry, detections, events,
     <>
       <div className="page-head">
         <h2>平台总览</h2>
-        <p>
-          面向小麦病害防控的空地协同精准施药系统。植保无人机负责空中广域巡查，地面监测机器人负责近距复核，
-          云端平台完成数据接入、实时决策、多维分析与作业下发，形成「监测—决策—执行—反馈」闭环。
-        </p>
+        <p>平台全局指标与地块态势：无人机空中巡查、机器人近距复核，云端完成决策与下发。</p>
       </div>
 
       {/* KPI */}
@@ -54,7 +51,7 @@ export default function Overview({ meta, devices, telemetry, detections, events,
           <div style={{ padding: '9px 15px 13px' }}>
             <div className="legend">
               <span><i style={{ background: CHART.blue }} />植保无人机</span>
-              <span><i style={{ background: CHART.purple }} />地面监测机器人</span>
+              <span><i style={{ background: CHART.robot }} />地面监测机器人</span>
               <span><i style={{ background: CHART.amber }} />联动事件</span>
               <span><i style={{ background: CHART.green }} />规划航线</span>
               <span><i style={{ background: MAP.obstacleStroke }} />障碍区</span>
@@ -67,13 +64,13 @@ export default function Overview({ meta, devices, telemetry, detections, events,
 
         <div className="stack">
           <div className="card">
-            <h3>平台四大能力</h3>
+            <h3>平台四大能力 <span className="tag">点击进入</span></h3>
             <div className="stack" style={{ gap: 9 }}>
               {[
-                ['① 实时数据传输', '无人机/机器人经 WebSocket 遥测通道按 5Hz 上报，云端 ACK 计时，端到端时延可量化；弱网环境支持批量补传。', 'onNav', 'realtime'],
-                ['② 多维统计分析', '空间/时间/病害/平台/作业/环境六维，每维输出可直接执行的农户结论，而非仅图表。', 'onNav', 'analytics'],
-                ['③ 空地实时联动', '空中发现→置信度判定→派单机器人→近距复核→确认→靶向喷洒，全链时延逐段可查。', 'onNav', 'linkage'],
-                ['④ 自动路径规划', '航向/速度/喷幅联合搜索，自动求解速度-喷洒比例，按经济/快速/环保三目标打分。', 'onNav', 'planner'],
+                ['① 实时数据传输', '5Hz 遥测上报，弱网批量补传，时延可量化', 'onNav', 'realtime'],
+                ['② 多维统计分析', '六维并行统计，每维输出可执行结论', 'onNav', 'analytics'],
+                ['③ 空地实时联动', '发现→派单→复核→确认→喷洒，全链时延可查', 'onNav', 'linkage'],
+                ['④ 自动路径规划', '航向×速度×喷幅联合搜索，三目标打分', 'onNav', 'planner'],
               ].map(([t, d, _, id]) => (
                 <div key={t} style={{ cursor: 'pointer' }} onClick={() => onNav(id)}>
                   <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent-2)' }}>{t}</div>
@@ -90,7 +87,7 @@ export default function Overview({ meta, devices, telemetry, detections, events,
             ) : (
               <div className="stack" style={{ gap: 8 }}>
                 {recentEvents.map(e => (
-                  <div key={e.eventId} style={{ borderLeft: '2px solid var(--warn)', paddingLeft: 9 }}>
+                  <div key={e.eventId} style={{ border: '1px solid var(--border)', padding: 8 }}>
                     <div className="row" style={{ gap: 6 }}>
                       <span className="pill warn">{(e.latency.total / 1000).toFixed(1)}s</span>
                       <span className="xs mono mute">R{e.grid.row}C{e.grid.col}</span>

@@ -13,10 +13,7 @@ export default function Farm({ meta, briefing, detections, devices, events }) {
     <>
       <div className="page-head">
         <h2>农户服务 · 今天该做什么</h2>
-        <p>
-          平台最终交付给农户的不是一堆图表，而是可执行的动作清单。
-          本页把平台的多维统计翻译成四类结论：先喷哪里、喷什么药、什么时候喷、这次省了多少钱。
-        </p>
+        <p>把多维统计翻译成可执行的动作清单：先喷哪里、喷什么药、什么时候喷、省了多少钱。</p>
       </div>
 
       <div className="card" style={{ marginBottom: 12 }}>

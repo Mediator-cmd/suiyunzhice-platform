@@ -30,10 +30,7 @@ export default function Analytics({ meta, loadDimension, detections }) {
     <>
       <div className="page-head">
         <h2>数据分析 · 六个维度</h2>
-        <p>
-          数据统计分析分成哪些维度？—— 空间、时间、病害、平台、作业、环境。
-          每一个维度不只给图表，而是同时给出「这意味着农户该做什么」的结论。
-        </p>
+        <p>空间、时间、病害、平台、作业、环境六维并行统计，每一维同时给出农户该做什么的结论。</p>
       </div>
 
       {/* 维度切换 */}
@@ -92,7 +89,7 @@ function SpatialView({ data, meta, detections }) {
     <div className="grid g-2-1">
       <div className="card">
         <h3>网格密度分布 <span className="tag">空间热度</span></h3>
-        <p className="hint">横轴为网格列，纵轴为网格行，颜色越亮表示该网格检出量越多。</p>
+        <p className="hint">横轴为网格列，纵轴为网格行，颜色越深表示检出量越多。</p>
         <Heatmap rows={data.rows || []} field={meta?.field} />
       </div>
       <div className="card">
@@ -143,7 +140,7 @@ function Heatmap({ rows, field }) {
       gap: 1,
       aspectRatio: `${field.widthM} / ${field.heightM}`,
       maxHeight: 420,
-      borderRadius: 4, overflow: 'hidden',
+      border: '1px solid var(--border)', overflow: 'hidden',
       background: 'var(--panel-2)',
     }}>{cells}</div>
   );
@@ -343,7 +340,7 @@ function EnvironmentView({ data }) {
         <h3>作业窗口建议</h3>
         <div className="stack" style={{ gap: 8 }}>
           {(data.rows || []).map(r => (
-            <div key={r.label} style={{ padding: '9px 11px', background: 'var(--panel-2)', borderRadius: 6 }}>
+            <div key={r.label} style={{ padding: '8px 8px', background: 'var(--panel-2)', border: '1px solid var(--border)' }}>
               <div className="row">
                 <b className="small">{r.label}</b>
                 <span className="spacer" />

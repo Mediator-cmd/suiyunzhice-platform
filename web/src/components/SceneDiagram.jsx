@@ -16,8 +16,8 @@ const MINT = '#e7f8f3';     // 参考图薄荷底
 const FIELD = '#f1f5f6';    // 参考图冷灰底
 const GREEN = '#16a34a';
 const BLUE = '#0284c7';
-const PURPLE = '#7c3aed';
-const AMBER = '#d97706';
+const RED = '#b91c1c';
+const YELLOW = '#ca8a04';
 
 export default function SceneDiagram({ height = 420 }) {
   return (
@@ -28,14 +28,6 @@ export default function SceneDiagram({ height = 420 }) {
       aria-label="空地协同精准植保作业场景示意图"
     >
       <defs>
-        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#f4faf9" />
-          <stop offset="100%" stopColor="#ffffff" />
-        </linearGradient>
-        <linearGradient id="cloudFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#ffffff" />
-          <stop offset="100%" stopColor={MINT} />
-        </linearGradient>
         <pattern id="rows" width="34" height="26" patternUnits="userSpaceOnUse">
           <path d="M4 26 L14 4" stroke="#cfe3d5" strokeWidth="2" />
           <path d="M16 26 L26 4" stroke="#cfe3d5" strokeWidth="2" />
@@ -43,7 +35,7 @@ export default function SceneDiagram({ height = 420 }) {
       </defs>
 
       {/* ---------- 天空 ---------- */}
-      <rect x="0" y="0" width="960" height="250" fill="url(#sky)" />
+      <rect x="0" y="0" width="960" height="250" fill="#f4faf9" />
       {/* ---------- 地面 ---------- */}
       <rect x="0" y="250" width="960" height="220" fill={FIELD} />
       <path d="M0 250 L960 250" stroke={INK} strokeWidth="2.5" />
@@ -74,10 +66,10 @@ export default function SceneDiagram({ height = 420 }) {
       <g>
         <path
           d="M372 96 a 44 44 0 0 1 9 -86 a 56 56 0 0 1 106 14 a 40 40 0 0 1 -4 80 z"
-          fill="url(#cloudFill)" stroke={INK} strokeWidth="3"
+          fill={MINT} stroke={INK} strokeWidth="3"
         />
         {/* 云内服务器机架 */}
-        <rect x="404" y="52" width="58" height="40" rx="5" fill="#ffffff" stroke={INK} strokeWidth="2.4" />
+        <rect x="404" y="52" width="58" height="40"  fill="#ffffff" stroke={INK} strokeWidth="2.4" />
         <line x1="404" y1="66" x2="462" y2="66" stroke={INK} strokeWidth="2" />
         <circle cx="412" cy="59" r="2.6" fill={GREEN} />
         <circle cx="412" cy="79" r="2.6" fill={BLUE} />
@@ -99,8 +91,8 @@ export default function SceneDiagram({ height = 420 }) {
         <circle cx="14" cy="79" r="9" fill="none" stroke={INK} strokeWidth="2.6" />
         <circle cx="126" cy="79" r="9" fill="none" stroke={INK} strokeWidth="2.6" />
         {/* 机身 */}
-        <rect x="34" y="28" width="72" height="40" rx="12" fill="#ffffff" stroke={INK} strokeWidth="3" />
-        <rect x="54" y="14" width="32" height="16" rx="5" fill={MINT} stroke={INK} strokeWidth="2.6" />
+        <rect x="34" y="28" width="72" height="40"  fill="#ffffff" stroke={INK} strokeWidth="3" />
+        <rect x="54" y="14" width="32" height="16"  fill={MINT} stroke={INK} strokeWidth="2.6" />
         <text x="70" y="26" fontSize="11" textAnchor="middle" fill={INK} fontWeight="700">药箱</text>
         {/* 云台相机 */}
         <path d="M62 68 L60 78 L80 78 L78 68" fill="none" stroke={INK} strokeWidth="2.6" />
@@ -117,14 +109,14 @@ export default function SceneDiagram({ height = 420 }) {
       {/* ---------- 地面机器人 ---------- */}
       <g transform="translate(300,300)">
         {/* 相机云台 */}
-        <rect x="38" y="0" width="46" height="22" rx="7" fill="#ffffff" stroke={INK} strokeWidth="3" />
+        <rect x="38" y="0" width="46" height="22"  fill="#ffffff" stroke={INK} strokeWidth="3" />
         <circle cx="76" cy="11" r="6" fill="none" stroke={INK} strokeWidth="2.6" />
         <line x1="61" y1="22" x2="61" y2="40" stroke={INK} strokeWidth="3" />
         {/* 天线 */}
         <line x1="96" y1="40" x2="112" y2="14" stroke={INK} strokeWidth="2.4" />
-        <circle cx="113" cy="12" r="4.5" fill={PURPLE} />
+        <circle cx="113" cy="12" r="4.5" fill={RED} />
         {/* 底盘 */}
-        <rect x="8" y="40" width="106" height="36" rx="9" fill="#ffffff" stroke={INK} strokeWidth="3" />
+        <rect x="8" y="40" width="106" height="36"  fill="#ffffff" stroke={INK} strokeWidth="3" />
         <line x1="40" y1="40" x2="40" y2="76" stroke="#b9c6c8" strokeWidth="2" strokeDasharray="4 4" />
         <line x1="82" y1="40" x2="82" y2="76" stroke="#b9c6c8" strokeWidth="2" strokeDasharray="4 4" />
         {/* 轮子 */}
@@ -133,7 +125,7 @@ export default function SceneDiagram({ height = 420 }) {
         <circle cx="92" cy="88" r="15" fill="#ffffff" stroke={INK} strokeWidth="3" />
         <circle cx="92" cy="88" r="4.5" fill={INK} />
       </g>
-      <text x="360" y="418" fontSize="16" textAnchor="middle" fill={PURPLE} fontWeight="700">地面监测机器人 ROB</text>
+      <text x="360" y="418" fontSize="16" textAnchor="middle" fill={RED} fontWeight="700">地面监测机器人 ROB</text>
       <text x="360" y="439" fontSize="14" textAnchor="middle" fill="#6b7d84">近距复核 · 叶下/根茎/土壤</text>
 
       {/* ---------- 数据链路箭头 ---------- */}
@@ -143,23 +135,23 @@ export default function SceneDiagram({ height = 420 }) {
       <text x="303" y="62" fontSize="13" textAnchor="middle" fill={BLUE} fontWeight="700" stroke="#ffffff" strokeWidth="3.5" paintOrder="stroke">遥测 5–10 Hz</text>
 
       {/* 云端 → 无人机（任务下发）*/}
-      <path d="M356 128 L268 138" stroke={AMBER} strokeWidth="3" strokeDasharray="9 6" fill="none" />
-      <path d="M276 132 L262 140 L276 146" fill="none" stroke={AMBER} strokeWidth="3" strokeLinejoin="round" />
-      <text x="312" y="116" fontSize="13" textAnchor="middle" fill={AMBER} fontWeight="700" stroke="#ffffff" strokeWidth="3.5" paintOrder="stroke">喷洒任务</text>
+      <path d="M356 128 L268 138" stroke={YELLOW} strokeWidth="3" strokeDasharray="9 6" fill="none" />
+      <path d="M276 132 L262 140 L276 146" fill="none" stroke={YELLOW} strokeWidth="3" strokeLinejoin="round" />
+      <text x="312" y="116" fontSize="13" textAnchor="middle" fill={YELLOW} fontWeight="700" stroke="#ffffff" strokeWidth="3.5" paintOrder="stroke">喷洒任务</text>
 
       {/* 云端 → 机器人（派单） */}
-      <path d="M430 130 C 430 210, 380 240, 372 296" stroke={AMBER} strokeWidth="3" strokeDasharray="9 6" fill="none" />
-      <path d="M378 288 L371 302 L385 300" fill="none" stroke={AMBER} strokeWidth="3" strokeLinejoin="round" />
-      <text x="452" y="212" fontSize="13" fill={AMBER} fontWeight="700" stroke="#ffffff" strokeWidth="3.5" paintOrder="stroke">派单复核</text>
+      <path d="M430 130 C 430 210, 380 240, 372 296" stroke={YELLOW} strokeWidth="3" strokeDasharray="9 6" fill="none" />
+      <path d="M378 288 L371 302 L385 300" fill="none" stroke={YELLOW} strokeWidth="3" strokeLinejoin="round" />
+      <text x="452" y="212" fontSize="13" fill={YELLOW} fontWeight="700" stroke="#ffffff" strokeWidth="3.5" paintOrder="stroke">派单复核</text>
 
       {/* 机器人 → 云端（复核结果） */}
-      <path d="M470 320 C 520 300, 520 210, 470 150" stroke={PURPLE} strokeWidth="3" strokeDasharray="9 6" fill="none" />
-      <path d="M478 158 L468 143 L484 146" fill="none" stroke={PURPLE} strokeWidth="3" strokeLinejoin="round" />
-      <text x="530" y="248" fontSize="13" fill={PURPLE} fontWeight="700" stroke="#ffffff" strokeWidth="3.5" paintOrder="stroke">复核证据</text>
+      <path d="M470 320 C 520 300, 520 210, 470 150" stroke={RED} strokeWidth="3" strokeDasharray="9 6" fill="none" />
+      <path d="M478 158 L468 143 L484 146" fill="none" stroke={RED} strokeWidth="3" strokeLinejoin="round" />
+      <text x="530" y="248" fontSize="13" fill={RED} fontWeight="700" stroke="#ffffff" strokeWidth="3.5" paintOrder="stroke">复核证据</text>
 
       {/* ---------- 底部时延条 ---------- */}
       <g transform="translate(24,308)">
-        <rect x="0" y="0" width="268" height="70" rx="10" fill="#ffffff" stroke="#d5dee0" strokeWidth="2" />
+        <rect x="0" y="0" width="268" height="70" fill="#ffffff" stroke="#d5dee0" strokeWidth="2" />
         <text x="14" y="21" fontSize="13" fill="#6b7d84">闭环端到端时延</text>
         <text x="14" y="53" fontSize="23" fontWeight="700" fill={GREEN}>1.8 s</text>
         <text x="112" y="36" fontSize="12.5" fill="#6b7d84">感知 120 / 下发 90</text>

@@ -10,14 +10,14 @@ import Farm from './pages/Farm.jsx';
 import Architecture from './pages/Architecture.jsx';
 
 const NAV = [
-  { id: 'overview',  label: '总览' },
-  { id: 'realtime',  label: '实时监控' },
-  { id: 'linkage',   label: '空地联动' },
-  { id: 'analytics', label: '数据分析' },
-  { id: 'planner',   label: '路径规划' },
-  { id: 'planning',  label: '平台方案' },
-  { id: 'farm',      label: '农户服务' },
-  { id: 'arch',      label: '系统架构' },
+  { id: 'overview',  label: '总览',     sub: '平台全局指标' },
+  { id: 'realtime',  label: '实时监控', sub: '传输与链路质量' },
+  { id: 'linkage',   label: '空地联动', sub: '三者实时协同' },
+  { id: 'analytics', label: '数据分析', sub: '六维统计与结论' },
+  { id: 'planner',   label: '路径规划', sub: '自动规划与比例' },
+  { id: 'planning',  label: '平台方案', sub: '能力与接入协议' },
+  { id: 'farm',      label: '农户服务', sub: '今日行动清单' },
+  { id: 'arch',      label: '系统架构', sub: '场景与流程图' },
 ];
 
 export default function App() {
@@ -138,19 +138,23 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="topbar">
+      <aside className="sidebar">
         <div className="brand">
           <h1>穗云智策</h1>
           <span className="sub">空地协同精准植保智能决策云平台</span>
         </div>
         <nav className="nav">
-          {NAV.map(n => (
+          {NAV.map((n, i) => (
             <button key={n.id}
               className={page === n.id ? 'active' : ''}
-              onClick={() => setPage(n.id)}>{n.label}</button>
+              title={n.sub}
+              onClick={() => setPage(n.id)}>
+              <span className="idx">{String(i + 1).padStart(2, '0')}</span>
+              <span>{n.label}</span>
+            </button>
           ))}
         </nav>
-        <div className="top-right">
+        <div className="side-foot">
           {meta && (
             <span className="badge" title="当前地块">
               <span className="mono">{meta.field.name}</span>
@@ -162,14 +166,14 @@ export default function App() {
             {mode === MODE.LIVE ? '实时接入' : '演示模式'}
           </span>
         </div>
-      </header>
+      </aside>
 
       <main className="main">
         {bootError && mode === MODE.MOCK && (
-          <div className="card" style={{ marginBottom: 12, borderColor: 'var(--warn)' }}>
+          <div className="card" style={{ marginBottom: 16, borderColor: 'var(--warn)' }}>
             <div className="small amber">
               当前为演示模式，数据由浏览器内置模拟器产生，功能完整可用。
-              接入真实设备后页面右上角将显示「实时接入」。
+              接入真实设备后侧边栏将显示「实时接入」。
             </div>
           </div>
         )}

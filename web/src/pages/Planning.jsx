@@ -45,7 +45,7 @@ const CAPABILITY = [
     key: 'analytics',
     title: '六维统计与农户结论',
     tag: '数据价值',
-    color: 'var(--robot)',
+    color: 'var(--danger)',
     points: [
       '空间、时间、病害、平台、作业、环境六个维度并行统计，每个维度都定位到具体网格与任务。',
       '每一维不止给图表，同时输出「农户下一步该做什么」的可执行结论。',
@@ -138,10 +138,7 @@ export default function Planning() {
     <>
       <div className="page-head">
         <h2>平台方案 · 能力总览</h2>
-        <p>
-          穗云智策把「无人机采集 → 云端决策 → 地面复核 → 靶向喷洒」这条链路做成一个可扩展的云端服务。
-          本页按能力模块说明平台解决的问题；设备接入协议与接口清单见本页下方。
-        </p>
+        <p>按能力模块说明平台解决的问题；设备接入协议与接口清单见本页下方。</p>
       </div>
 
       <div className="grid g2" style={{ marginBottom: 12 }}>
@@ -153,13 +150,13 @@ export default function Planning() {
               <span className="pill">{c.tag}</span>
             </div>
             <ul className="insights" style={{ marginBottom: 11 }}>
-              {c.points.map((p, i) => <li key={i} style={{ borderLeftColor: c.color }}>{p}</li>)}
+              {c.points.map((p, i) => <li key={i}>{p}</li>)}
             </ul>
             <div className="grid g3" style={{ gap: 8 }}>
               {c.metric.map(([l, v]) => (
                 <div key={l} style={{
-                  padding: '7px 10px', background: 'var(--panel-2)',
-                  borderRadius: 6, borderLeft: `2px solid ${c.color}`,
+                  padding: '8px 8px', background: 'var(--panel-2)',
+                  border: `1px solid ${c.color}`,
                 }}>
                   <div className="xs mute">{l}</div>
                   <div className="mono" style={{ fontSize: 17, fontWeight: 700, color: c.color }}>{v}</div>
@@ -184,8 +181,8 @@ export default function Planning() {
               '每个候选解都带完整的航向、速度、喷幅、流量、占空比、预计时长与药量，可直接作为作业参数下发，而不是只给一张漂亮航线图。'],
           ].map(([t, d]) => (
             <div key={t} style={{
-              padding: '11px 13px', background: 'var(--panel-2)',
-              borderRadius: 7, borderLeft: '2px solid var(--accent)',
+              padding: '16px', background: 'var(--panel-2)',
+              border: '1px solid var(--accent)',
             }}>
               <div className="small" style={{ fontWeight: 600, marginBottom: 4 }}>{t}</div>
               <div className="xs dim" style={{ lineHeight: 1.65 }}>{d}</div>
@@ -201,8 +198,8 @@ export default function Planning() {
             设备端只需要按下面格式连上来即可，无需了解平台内部实现。
           </p>
           <pre style={{
-            background: 'var(--panel-2)', border: '1px solid var(--border)', borderRadius: 6,
-            padding: 12, overflow: 'auto', fontSize: 13, lineHeight: 1.7, margin: 0,
+            background: 'var(--panel-2)', border: '1px solid var(--border)',
+            padding: 16, overflow: 'auto', fontSize: 13, lineHeight: 1.7, margin: 0,
             color: 'var(--text)',
           }} className="mono">{DEVICE_PROTO}</pre>
         </div>
@@ -217,7 +214,7 @@ export default function Planning() {
                 {API_ROWS.map(([m, p, d]) => (
                   <tr key={p}>
                     <td><span className="pill xs" style={{
-                      color: m === 'GET' ? CHART.blue : m === 'POST' ? CHART.amber : CHART.purple,
+                      color: m === 'GET' ? CHART.blue : m === 'POST' ? CHART.amber : CHART.green,
                     }}>{m}</span></td>
                     <td className="mono xs">{p}</td>
                     <td className="xs dim">{d}</td>

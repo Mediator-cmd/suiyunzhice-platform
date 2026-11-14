@@ -61,11 +61,7 @@ export default function Linkage({ meta, devices, detections, events, overview })
     <>
       <div className="page-head">
         <h2>空地联动 · 三者实时协同</h2>
-        <p>
-          小车的数据和无人机的数据如何互相整理统计 —— 平台的做法不是「把两份数据放一起」，
-          而是让两类数据在同一条决策链上互补：空中提供广度与速度，地面提供深度与确定性，
-          云端负责在两者之间做可信的裁决，并把裁决结果再变成可执行任务。
-        </p>
+        <p>空地数据在同一条决策链上互补：空中给广度与速度，地面给深度与确定性，云端裁决并下发。</p>
       </div>
 
       {/* 联动链路示意 */}
@@ -124,10 +120,7 @@ export default function Linkage({ meta, devices, detections, events, overview })
       <div className="grid g-2-1" style={{ marginBottom: 12 }}>
         <div className="card">
           <h3>时延分解 <span className="tag">每一段都可查</span></h3>
-          <p className="hint">
-            把"联动慢"这件事拆成三段：感知决策（毫秒级）、决策下发（毫秒级）、执行到位（秒级，主要耗在机器人行驶与采集）。
-            这样才能定位瓶颈：是算法慢、通信慢，还是物理行程远。
-          </p>
+          <p className="hint">把联动时延拆成感知决策、决策下发、执行到位三段，定位瓶颈。</p>
           {stats && (
             <div className="grid g3" style={{ marginBottom: 12 }}>
               {[
@@ -135,7 +128,7 @@ export default function Linkage({ meta, devices, detections, events, overview })
                 ['决策 → 下发', stats.dispatch, 'ms', '生成任务并推送至地面机器人', 'blue'],
                 ['下发 → 执行到位', stats.act, 'ms', '机器人行驶 + 近距采集 + 回传', 'amber'],
               ].map(([label, val, unit, desc, cls]) => (
-                <div key={label} style={{ padding: '9px 11px', background: 'var(--panel-2)', borderRadius: 6 }}>
+                <div key={label} style={{ padding: '8px 8px', background: 'var(--panel-2)', border: '1px solid var(--border)' }}>
                   <div className="xs dim">{label}</div>
                   <div className={`value ${cls}`} style={{ fontSize: 25 }}>
                     {val >= 1000 ? (val / 1000).toFixed(1) : val}<span className="xs mute"> {val >= 1000 ? 's' : unit}</span>
@@ -156,7 +149,7 @@ export default function Linkage({ meta, devices, detections, events, overview })
 
         <div className="card">
           <h3>联动触发判据</h3>
-          <p className="hint">每一条判据都可追溯到具体事件，判据本身也是可配置参数。</p>
+          <p className="hint">每条判据可追溯到具体事件，判据本身可配置。</p>
           <table className="tbl">
             <thead><tr><th>判据</th><th>原因</th><th>动作</th></tr></thead>
             <tbody>
@@ -182,10 +175,7 @@ export default function Linkage({ meta, devices, detections, events, overview })
           <h3>事件流</h3>
           <div className="table-scroll" style={{ maxHeight: 340 }}>
             {(events || []).length === 0 ? (
-              <div className="empty">
-                暂无联动事件。<br />
-                无人机识别出低置信度病斑或根茎部病害时，将自动派单地面机器人复核，形成闭环。
-              </div>
+              <div className="empty">暂无联动事件</div>
             ) : (
               <table className="tbl">
                 <thead><tr><th>时间</th><th>网格</th><th>触发原因</th><th className="right">总时延</th></tr></thead>

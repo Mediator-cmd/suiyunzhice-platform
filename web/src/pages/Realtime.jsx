@@ -49,22 +49,22 @@ export default function Realtime({ meta, devices, telemetry, linkMetrics, mode }
     {
       name: 'WebSocket 遥测通道（主用）',
       path: 'ws://host/ws/telemetry',
-      desc: '设备端以 5–10Hz 推送遥测帧，云端逐帧 ACK 并回传服务器时间戳，设备据此计算 RTT 与端到端时延。',
-      why: '长连接、低开销、可双向，是实时性最好的通道。植保作业中遥测与识别结果同帧上送，采集到云端可见 < 150ms。',
+      desc: '5–10Hz 推送遥测帧，云端逐帧 ACK 并回传时间戳，计算 RTT 与端到端时延。',
+      why: '长连接低开销，采集到云端可见 < 150ms。',
       tag: '生产主用',
     },
     {
       name: 'HTTP 批量补传（弱网兜底）',
       path: 'POST /api/ingest/batch',
-      desc: '设备在信号盲区缓存帧，恢复后批量上报，携带自增 seq，云端按 seq 补齐空洞并统计丢包率。',
-      why: '麦田环境遮挡与电磁干扰多，批量补传保证「不丢数据」，而非靠重传保证实时。',
+      desc: '盲区缓存帧，恢复后按 seq 批量上报，云端补齐空洞并统计丢包率。',
+      why: '保证「不丢数据」，而非靠重传保证实时。',
       tag: '弱网必备',
     },
     {
       name: 'MQTT over WebSocket（扩展）',
       path: 'mqtt://host:8083/mqtt',
-      desc: '为多机队扩展预留：按 device/topic 分层，QoS0 传遥测、QoS1 传识别结果与任务回执。',
-      why: '当设备数从 2 台扩展到数十台时，MQTT 的发布/订阅模型比点对点更省带宽。',
+      desc: '按 device/topic 分层，QoS0 传遥测、QoS1 传识别结果与任务回执。',
+      why: '设备数达数十台时，发布/订阅比点对点更省带宽。',
       tag: '后续扩展',
     },
   ];
@@ -73,10 +73,7 @@ export default function Realtime({ meta, devices, telemetry, linkMetrics, mode }
     <>
       <div className="page-head">
         <h2>实时监控 · 数据传输与链路质量</h2>
-        <p>
-          无人机采集的数据如何与云端平台传输、实时性如何保证 —— 本页给出三条通道的分工，
-          并用实测的端到端时延、丢包率、RTT 三项指标直接呈现链路健康度。
-        </p>
+        <p>三条传输通道的分工，以及端到端时延、丢包率、往返时延三项链路健康指标。</p>
       </div>
 
       {/* 链路指标 */}
@@ -126,10 +123,7 @@ export default function Realtime({ meta, devices, telemetry, linkMetrics, mode }
               {(devices || []).map(d => <option key={d.deviceId} value={d.deviceId}>{d.deviceId}</option>)}
             </select>
           </h3>
-          <p className="hint">
-            端到端时延 = 云端收到帧的时刻 − 设备采集该帧的时刻（设备端 ts 字段，Unix 毫秒）。
-            这是"实时性"最直接的可量化证据。
-          </p>
+          <p className="hint">端到端时延 = 云端收帧时刻 − 设备采集时刻。</p>
           <ResponsiveContainer width="100%" height={230}>
             <LineChart data={series}>
               <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" />
@@ -140,8 +134,8 @@ export default function Realtime({ meta, devices, telemetry, linkMetrics, mode }
               <Line type="monotone" dataKey="latency" name="端到端时延(ms)" stroke={CHART.green} dot={false} strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
-          <div className="xs mute" style={{ marginTop: 6 }}>
-            阈值参考：&lt;150ms 为实时可用；150–500ms 可接受；&gt;500ms 需检查链路或改走批量补传。
+          <div className="xs mute" style={{ marginTop: 8 }}>
+            阈值：&lt;150ms 实时可用 · 150–500ms 可接受 · &gt;500ms 需检查链路
           </div>
         </div>
 
@@ -185,10 +179,7 @@ export default function Realtime({ meta, devices, telemetry, linkMetrics, mode }
       {/* 传输通道设计 */}
       <div className="card">
         <h3>数据传输通道设计 <span className="tag">实时性保证</span></h3>
-        <p className="hint">
-          农田中继站覆盖有限、电离层与电机干扰强，单一通道无法兼顾「实时」与「不丢」。
-          平台采用主通道 + 兜底通道 + 扩展通道的三层设计。
-        </p>
+        <p className="hint">主通道保实时，兜底通道保不丢，扩展通道保规模。</p>
         <div className="grid g3">
           {channels.map(c => (
             <div key={c.name} className="card" style={{ background: 'var(--panel-2)' }}>
