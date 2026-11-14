@@ -79,7 +79,7 @@ export class Platform {
   meta() {
     const f = this.field;
     return {
-      name: '麦田智翼 · 空地协同精准植保云平台',
+      name: '穗云智策 · 空地协同精准植保智能决策云平台',
       version: '1.0.0',
       field: {
         id: f.id, name: f.name,

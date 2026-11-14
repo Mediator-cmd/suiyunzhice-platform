@@ -1,10 +1,10 @@
 /**
- * 麦田智翼 · 空地协同云平台 —— 服务端入口
+ * 穗云智策 · 空地协同云平台 —— 服务端入口
  *
  * 启动：node server/src/index.js
  * 环境变量：
  *   PORT           监听端口，默认 8080
- *   DB_PATH        SQLite 路径，默认 ./data/maitian.db
+ *   DB_PATH        SQLite 路径，默认 ./data/suiyun.db
  *   SIM            是否启动内置数据模拟器，默认 1
  */
 
@@ -31,7 +31,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 
 const PORT = Number(process.env.PORT || 8080);
-const DB_PATH = process.env.DB_PATH || join(ROOT, 'data', 'maitian.db');
+const DB_PATH = process.env.DB_PATH || join(ROOT, 'data', 'suiyun.db');
 const SIM = process.env.SIM !== '0';
 
 const store = new Store(DB_PATH);
@@ -263,7 +263,7 @@ if (SIM) {
 }
 
 server.listen(PORT, () => {
-  console.log(`麦田智翼平台已启动: http://localhost:${PORT}`);
+  console.log(`穗云智策平台已启动: http://localhost:${PORT}`);
   console.log(`  API  : http://localhost:${PORT}/api`);
   console.log(`  遥测 : ws://localhost:${PORT}/ws/telemetry`);
   console.log(`  实时 : ws://localhost:${PORT}/ws/live`);

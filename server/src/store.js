@@ -11,7 +11,7 @@ import { dirname } from 'node:path';
 const nz = (v) => (v === undefined ? null : v);
 
 export class Store {
-  constructor(dbPath = './data/maitian.db') {
+  constructor(dbPath = './data/suiyun.db') {
     if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });
     this.db = new DatabaseSync(dbPath);
     this.migrate();

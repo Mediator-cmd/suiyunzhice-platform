@@ -1,10 +1,11 @@
+import { CHART } from '../theme.js';
 import React, { useEffect, useState, useMemo } from 'react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip,
   CartesianGrid, Legend, PieChart, Pie, Cell, AreaChart, Area, LineChart, Line,
 } from 'recharts';
 
-const COLORS = ['#38bdf8', '#a78bfa', '#4ade80', '#fbbf24', '#f87171', '#f97316', '#e879f9'];
+const COLORS = CHART.series;
 
 const DIM_LABEL = {
   spatial: '空间维度', temporal: '时间维度', disease: '病害维度',
@@ -126,8 +127,9 @@ function Heatmap({ rows, field }) {
       const d = g?.density || 0;
       cells.push(
         <div key={`${r}_${c}`} title={d ? `R${r}C${c} · 检出 ${d} 处` : ''} style={{
-          background: d === 0 ? '#141d26' : `rgba(248,113,113,${Math.min(0.9, 0.18 + d * 0.16)})`,
-          border: '1px solid rgba(38,51,63,.4)',
+          // 检出越密颜色越深；无检出的格子保持浅灰，与地块底色一致
+          background: d === 0 ? 'var(--panel-2)' : `rgba(220,38,38,${Math.min(0.88, 0.4 + d * 0.12)})`,
+          border: d === 0 ? '1px solid var(--border)' : '1px solid rgba(185,28,28,.25)',
         }} />
       );
     }
@@ -142,7 +144,7 @@ function Heatmap({ rows, field }) {
       aspectRatio: `${field.widthM} / ${field.heightM}`,
       maxHeight: 420,
       borderRadius: 4, overflow: 'hidden',
-      background: '#141d26',
+      background: 'var(--panel-2)',
     }}>{cells}</div>
   );
 }
@@ -155,13 +157,13 @@ function TemporalView({ data }) {
         <h3>检出与施药趋势</h3>
         <ResponsiveContainer width="100%" height={260}>
           <AreaChart data={data.rows || []}>
-            <CartesianGrid stroke="#26333f" strokeDasharray="3 3" />
-            <XAxis dataKey="day" stroke="#62717f" tick={{ fontSize: 10 }} />
-            <YAxis stroke="#62717f" tick={{ fontSize: 10 }} />
-            <RTooltip contentStyle={{ background: '#17212c', border: '1px solid #26333f', fontSize: 12 }} />
+            <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" />
+            <XAxis dataKey="day" stroke={CHART.axis} tick={{ fontSize: 10 }} />
+            <YAxis stroke={CHART.axis} tick={{ fontSize: 10 }} />
+            <RTooltip contentStyle={{ background: CHART.tooltipBg, border: `1px solid ${CHART.tooltipBorder}`, fontSize: 12 }} />
             <Legend wrapperStyle={{ fontSize: 11.5 }} />
-            <Area type="monotone" dataKey="count" name="检出量" stroke="#38bdf8" fill="#38bdf8" fillOpacity={0.22} />
-            <Area type="monotone" dataKey="sprays" name="施药任务数" stroke="#4ade80" fill="#4ade80" fillOpacity={0.16} />
+            <Area type="monotone" dataKey="count" name="检出量" stroke={CHART.blue} fill={CHART.blue} fillOpacity={0.22} />
+            <Area type="monotone" dataKey="sprays" name="施药任务数" stroke={CHART.green} fill={CHART.green} fillOpacity={0.16} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -199,7 +201,7 @@ function DiseaseView({ data }) {
               <Pie data={pie} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={78} innerRadius={42}>
                 {pie.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
               </Pie>
-              <RTooltip contentStyle={{ background: '#17212c', border: '1px solid #26333f', fontSize: 12 }} />
+              <RTooltip contentStyle={{ background: CHART.tooltipBg, border: `1px solid ${CHART.tooltipBorder}`, fontSize: 12 }} />
               <Legend wrapperStyle={{ fontSize: 11.5 }} />
             </PieChart>
           </ResponsiveContainer>
@@ -326,14 +328,14 @@ function EnvironmentView({ data }) {
         <h3>各时段检出与置信度</h3>
         <ResponsiveContainer width="100%" height={240}>
           <BarChart data={data.rows || []}>
-            <CartesianGrid stroke="#26333f" strokeDasharray="3 3" />
-            <XAxis dataKey="label" stroke="#62717f" tick={{ fontSize: 10 }} />
-            <YAxis yAxisId="l" stroke="#62717f" tick={{ fontSize: 10 }} />
-            <YAxis yAxisId="r" orientation="right" stroke="#62717f" tick={{ fontSize: 10 }} domain={[0, 1]} />
-            <RTooltip contentStyle={{ background: '#17212c', border: '1px solid #26333f', fontSize: 12 }} />
+            <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" />
+            <XAxis dataKey="label" stroke={CHART.axis} tick={{ fontSize: 10 }} />
+            <YAxis yAxisId="l" stroke={CHART.axis} tick={{ fontSize: 10 }} />
+            <YAxis yAxisId="r" orientation="right" stroke={CHART.axis} tick={{ fontSize: 10 }} domain={[0, 1]} />
+            <RTooltip contentStyle={{ background: CHART.tooltipBg, border: `1px solid ${CHART.tooltipBorder}`, fontSize: 12 }} />
             <Legend wrapperStyle={{ fontSize: 11.5 }} />
-            <Bar yAxisId="l" dataKey="count" name="检出量" fill="#38bdf8" />
-            <Line yAxisId="r" dataKey="avgConfidence" name="平均置信度" stroke="#4ade80" strokeWidth={2} />
+            <Bar yAxisId="l" dataKey="count" name="检出量" fill={CHART.blue} />
+            <Line yAxisId="r" dataKey="avgConfidence" name="平均置信度" stroke={CHART.green} strokeWidth={2} />
           </BarChart>
         </ResponsiveContainer>
       </div>

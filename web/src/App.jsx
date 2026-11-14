@@ -15,7 +15,7 @@ const NAV = [
   { id: 'linkage',   label: '空地联动' },
   { id: 'analytics', label: '数据分析' },
   { id: 'planner',   label: '路径规划' },
-  { id: 'planning',  label: '方案与部署' },
+  { id: 'planning',  label: '平台方案' },
   { id: 'farm',      label: '农户服务' },
   { id: 'arch',      label: '系统架构' },
 ];
@@ -140,8 +140,8 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <h1>麦田智翼</h1>
-          <span className="sub">空地协同精准植保云平台</span>
+          <h1>穗云智策</h1>
+          <span className="sub">空地协同精准植保智能决策云平台</span>
         </div>
         <nav className="nav">
           {NAV.map(n => (
@@ -166,10 +166,10 @@ export default function App() {
 
       <main className="main">
         {bootError && mode === MODE.MOCK && (
-          <div className="card" style={{ marginBottom: 12, borderColor: 'rgba(251,191,36,.4)' }}>
+          <div className="card" style={{ marginBottom: 12, borderColor: 'var(--warn)' }}>
             <div className="small amber">
-              未能连接云端服务（{bootError}），当前使用浏览器内置模拟器演示。
-              完整功能与真实设备接入请看「方案与部署」页。
+              当前为演示模式，数据由浏览器内置模拟器产生，功能完整可用。
+              接入真实设备后页面右上角将显示「实时接入」。
             </div>
           </div>
         )}

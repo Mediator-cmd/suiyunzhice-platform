@@ -1,16 +1,12 @@
 import React, { useMemo } from 'react';
 import { MapContainer, ImageOverlay, Polygon, Polyline, Marker, CircleMarker, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
+import { MAP, DISEASE_COLOR } from '../theme.js';
 
 /**
  * 地块地图：本地 ENU 坐标 → Leaflet 的 CRS.Simple
  * 不用在线瓦片，保证离线/内网/演示环境都能渲染。
  */
-
-const DISEASE_COLOR = {
-  rust: '#f97316', powdery: '#e879f9', loose_smut: '#a3e635',
-  root_rot: '#f43f5e', fusarium: '#fbbf24', leaf_blight: '#94a3b8',
-};
 
 export function FieldMap({
   field, route, devices, detections, events, height = 460, onGridClick, selectedGrid,
@@ -38,7 +34,7 @@ export function FieldMap({
         toLL(x, y), toLL(x + cw, y), toLL(x + cw, y + ch), toLL(x, y + ch),
       ];
       const maxConf = Math.max(...list.map(d => d.confidence));
-      const color = DISEASE_COLOR[list[0].disease] || '#f87171';
+      const color = DISEASE_COLOR[list[0].disease] || '#dc2626';
       out.push({ key, poly, color, maxConf, count: list.length, disease: list[0].disease });
     }
     return out;
@@ -75,19 +71,19 @@ export function FieldMap({
         crs={L.CRS.Simple}
         bounds={bounds}
         boundsOptions={{ padding: [8, 8] }}
-        style={{ height: '100%', width: '100%', background: '#0f171e' }}
+        style={{ height: '100%', width: '100%', background: MAP.bg }}
         attributionControl={true}
       >
         {/* 地块底色 */}
         <Polygon
           positions={[toLL(0, 0), toLL(field.widthM, 0), toLL(field.widthM, field.heightM), toLL(0, field.heightM)]}
-          pathOptions={{ color: '#33424f', weight: 1.5, fillColor: '#16212b', fillOpacity: 0.9 }}
+          pathOptions={{ color: MAP.fieldStroke, weight: 1.5, fillColor: MAP.fieldFill, fillOpacity: 0.95 }}
         />
 
         {/* 障碍区 */}
         {obstaclePolys.map((poly, i) => (
           <Polygon key={i} positions={poly}
-            pathOptions={{ color: '#8b5cf6', weight: 1, dashArray: '4 3', fillColor: '#4c1d95', fillOpacity: 0.4 }} />
+            pathOptions={{ color: MAP.obstacleStroke, weight: 1.5, dashArray: '4 3', fillColor: MAP.obstacleFill, fillOpacity: 0.75 }} />
         ))}
 
         {/* 病害网格 */}
@@ -95,7 +91,7 @@ export function FieldMap({
           <Polygon key={g.key} positions={g.poly}
             eventHandlers={onGridClick ? { click: () => onGridClick({ row: g.key.split('_')[0] * 1, col: g.key.split('_')[1] * 1 }) } : {}}
             pathOptions={{
-              color: g.key === selectedGrid ? '#fff' : g.color,
+              color: g.key === selectedGrid ? '#16a34a' : g.color,
               weight: g.key === selectedGrid ? 2.5 : 1,
               fillColor: g.color,
               fillOpacity: 0.18 + g.maxConf * 0.42,
@@ -110,13 +106,13 @@ export function FieldMap({
 
         {/* 规划航线 */}
         {routeLine && (
-          <Polyline positions={routeLine} pathOptions={{ color: '#4ade80', weight: 2.2, opacity: 0.95 }} />
+          <Polyline positions={routeLine} pathOptions={{ color: MAP.route, weight: 2.4, opacity: 0.95 }} />
         )}
 
         {/* 联动事件 */}
         {eventMarks.map(({ e, pos }) => (
           <CircleMarker key={e.eventId} center={pos} radius={6}
-            pathOptions={{ color: '#fbbf24', weight: 2, fillColor: '#fbbf24', fillOpacity: 0.4 }}>
+            pathOptions={{ color: MAP.routeManual, weight: 2, fillColor: MAP.routeManual, fillOpacity: 0.45 }}>
             <Tooltip>
               <b>联动闭环</b><br />
               {(e.chain || []).join(' → ')}<br />
@@ -132,8 +128,8 @@ export function FieldMap({
               className: 'dev-marker',
               html: `<div style="
                 width:16px;height:16px;border-radius:50%;
-                background:${d.kind === 'uav' ? '#38bdf8' : '#a78bfa'};
-                border:2px solid #0d1218; box-shadow:0 0 8px ${d.kind === 'uav' ? '#38bdf8' : '#a78bfa'};
+                background:${d.kind === 'uav' ? '#0284c7' : '#7c3aed'};
+                border:2px solid #ffffff; box-shadow:0 1px 4px rgba(28,43,34,.35);
               "></div>`,
               iconSize: [16, 16], iconAnchor: [8, 8],
             })}>

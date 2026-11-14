@@ -1,3 +1,4 @@
+import { CHART } from '../theme.js';
 import React, { useMemo } from 'react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid,
@@ -218,13 +219,13 @@ function LatencyChart({ data }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} stackOffset="none">
-        <CartesianGrid stroke="#26333f" strokeDasharray="3 3" />
-        <XAxis dataKey="time" stroke="#62717f" tick={{ fontSize: 10 }} minTickGap={40} />
-        <YAxis stroke="#62717f" tick={{ fontSize: 10 }} unit=" ms" width={62} />
-        <RTooltip contentStyle={{ background: '#17212c', border: '1px solid #26333f', fontSize: 12 }} />
-        <Bar dataKey="感知决策" stackId="a" fill="#4ade80" />
-        <Bar dataKey="决策下发" stackId="a" fill="#38bdf8" />
-        <Bar dataKey="执行到位" stackId="a" fill="#fbbf24" />
+        <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" />
+        <XAxis dataKey="time" stroke={CHART.axis} tick={{ fontSize: 10 }} minTickGap={40} />
+        <YAxis stroke={CHART.axis} tick={{ fontSize: 10 }} unit=" ms" width={62} />
+        <RTooltip contentStyle={{ background: CHART.tooltipBg, border: `1px solid ${CHART.tooltipBorder}`, fontSize: 12 }} />
+        <Bar dataKey="感知决策" stackId="a" fill={CHART.green} />
+        <Bar dataKey="决策下发" stackId="a" fill={CHART.blue} />
+        <Bar dataKey="执行到位" stackId="a" fill={CHART.amber} />
       </BarChart>
     </ResponsiveContainer>
   );

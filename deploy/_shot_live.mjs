@@ -9,7 +9,7 @@ import { chromium } from 'playwright-core';
 
 const EXE = 'C:/Users/ASUS/AppData/Local/ms-playwright/chromium-1208/chrome-win64/chrome.exe';
 const OUT = 'C:/Users/ASUS/_shots';
-const URL = process.argv[2] || 'https://mediator-cmd.github.io/maitian-platform/';
+const URL = process.argv[2] || 'https://mediator-cmd.github.io/suiyunzhice-platform/';
 
 const PAGES = [
   ['overview',  '总览'],
@@ -17,7 +17,7 @@ const PAGES = [
   ['linkage',   '空地联动'],
   ['analytics', '数据分析'],
   ['planner',   '路径规划'],
-  ['planning',  '方案与部署'],
+  ['planning',  '平台方案'],
   ['farm',      '农户服务'],
   ['arch',      '系统架构'],
 ];

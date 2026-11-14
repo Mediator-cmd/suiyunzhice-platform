@@ -3,19 +3,19 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile
-    image: maitian-platform:latest
-    container_name: maitian-platform
+    image: suiyunzhice-platform:latest
+    container_name: suiyunzhice-platform
     restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
       - NODE_ENV=production
       - PORT=8080
-      - DB_PATH=/data/maitian.db
+      - DB_PATH=/data/suiyun.db
       # 关闭内置模拟器时改为 1；接入真实设备后建议 SIM=0
       - SIM=${SIM:-1}
     volumes:
-      - maitian-data:/data
+      - suiyun-data:/data
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/meta"]
       interval: 30s
@@ -37,4 +37,4 @@ services:
   #     - platform
 
 volumes:
-  maitian-data:
+  suiyun-data:

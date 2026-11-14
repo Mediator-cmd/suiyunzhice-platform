@@ -1,8 +1,8 @@
 {
-  "name": "maitian-platform",
+  "name": "suiyunzhice-platform",
   "version": "1.0.0",
   "private": true,
-  "description": "麦田智翼 · 空地协同精准植保云平台",
+  "description": "穗云智策 · 空地协同精准植保智能决策云平台",
   "type": "module",
   "workspaces": ["web"],
   "scripts": {

@@ -255,7 +255,7 @@ export default function Planner({ meta }) {
                 </div>
               </div>
               {!ratio.feasible && (
-                <div className="conclusion" style={{ background: 'linear-gradient(90deg,rgba(248,113,113,.12),rgba(248,113,113,.02))', borderColor: 'var(--danger)' }}>
+                <div className="conclusion" style={{ background: 'var(--danger-soft)', borderColor: 'var(--danger)' }}>
                   <b>当前参数超出喷头能力</b>：需降低速度、减小喷幅或降低目标施药量。平台会在下发任务前自动拦截这类不合法参数。
                 </div>
               )}
@@ -316,7 +316,7 @@ export default function Planner({ meta }) {
               </tr></thead>
               <tbody>
                 {plan.candidates.slice(0, 24).map((c, i) => (
-                  <tr key={i} style={i === 0 ? { background: 'rgba(74,222,128,.06)' } : {}}>
+                  <tr key={i} style={i === 0 ? { background: 'var(--accent-soft)' } : {}}>
                     <td className="num">{i === 0 ? <span className="pill ok">最优</span> : i + 1}</td>
                     <td className="num">{c.headingDeg}°</td>
                     <td className="num">{c.speedMs}</td>

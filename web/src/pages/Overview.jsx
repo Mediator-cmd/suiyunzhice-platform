@@ -1,4 +1,5 @@
 import React from 'react';
+import { CHART, MAP } from '../theme.js';
 import { FieldMap, DISEASE_COLOR } from '../components/FieldMap.jsx';
 
 export default function Overview({ meta, devices, telemetry, detections, events, overview, briefing, mode, onNav }) {
@@ -28,13 +29,6 @@ export default function Overview({ meta, devices, telemetry, detections, events,
           面向小麦病害防控的空地协同精准施药系统。植保无人机负责空中广域巡查，地面监测机器人负责近距复核，
           云端平台完成数据接入、实时决策、多维分析与作业下发，形成「监测—决策—执行—反馈」闭环。
         </p>
-        <p style={{ marginTop: 6 }}>
-          公网访问地址：
-          <a className="mono blue" href="https://Mediator-cmd.github.io/maitian-platform/"
-            target="_blank" rel="noreferrer">
-            https://Mediator-cmd.github.io/maitian-platform/
-          </a>
-        </p>
       </div>
 
       {/* KPI */}
@@ -59,11 +53,11 @@ export default function Overview({ meta, devices, telemetry, detections, events,
           <FieldMap field={meta.field} devices={devices} detections={detections} events={events} height={430} />
           <div style={{ padding: '9px 15px 13px' }}>
             <div className="legend">
-              <span><i style={{ background: '#38bdf8' }} />植保无人机</span>
-              <span><i style={{ background: '#a78bfa' }} />地面监测机器人</span>
-              <span><i style={{ background: '#fbbf24' }} />联动事件</span>
-              <span><i style={{ background: '#4ade80' }} />规划航线</span>
-              <span><i style={{ background: '#8b5cf6' }} />障碍区</span>
+              <span><i style={{ background: CHART.blue }} />植保无人机</span>
+              <span><i style={{ background: CHART.purple }} />地面监测机器人</span>
+              <span><i style={{ background: CHART.amber }} />联动事件</span>
+              <span><i style={{ background: CHART.green }} />规划航线</span>
+              <span><i style={{ background: MAP.obstacleStroke }} />障碍区</span>
               {Object.entries(DISEASE_COLOR).map(([k, v]) => (
                 <span key={k}><i style={{ background: v }} />{meta.diseases.find(d => d.code === k)?.name || k}</span>
               ))}
