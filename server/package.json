@@ -1,0 +1,12 @@
+{
+  "name": "maitian-server",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "麦田智翼空地协同云平台 —— 服务端运行时依赖（Docker 生产镜像使用）",
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  }
+}

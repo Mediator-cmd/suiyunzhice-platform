@@ -4,8 +4,9 @@
 # ---------- 前端构建 ----------
 FROM node:22-alpine AS web-builder
 WORKDIR /build
-COPY package*.json ./
-RUN npm install --omit=optional --no-audit --no-fund
+# web/ 自带 package.json，前端依赖在 web/ 内部安装即可。
+# 必须先 COPY web/ 再安装：vite.config.js 会 import ../../shared/*，
+# shared/ 也要一起放进构建上下文。
 COPY shared/ ./shared/
 COPY web/ ./web/
 WORKDIR /build/web
@@ -18,7 +19,11 @@ ENV NODE_ENV=production PORT=8080 DB_PATH=/data/maitian.db
 
 RUN apk add --no-cache tini curl
 
-COPY package*.json ./
+# 服务端只依赖 express 与 ws（均为纯 JS，无原生模块）。
+# 这里用 server/package.json 而不是根 package.json：
+# 根 package.json 声明了 workspaces:["web"]，而运行阶段并不包含 web/，
+# 直接 npm install 会因「找不到工作区」而失败。
+COPY server/package.json ./package.json
 RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
 
 COPY shared/ ./shared/
