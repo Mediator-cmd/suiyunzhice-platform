@@ -27,6 +27,10 @@ import { buildSprayMissions } from '../../shared/spraydispatch.js';
 import {
   DISEASES, ANALYTICS_DIMENSIONS, DEVICE_STATES, PLAN_OBJECTIVES, SPRAY_RATIO_NOTE,
 } from '../../shared/schema.js';
+import {
+  SPRAY_STRATEGIES, AGRO_CALENDAR, SPRAY_WINDOW_RULES,
+  currentWeather, weatherForecast, windScale, strategyFor,
+} from '../../shared/agronomy.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
@@ -142,6 +146,25 @@ api.get('/linkage/events', (req, res) => res.json({
 api.get('/analytics/overview', (req, res) => res.json(analytics.overview()));
 api.get('/analytics/:dim', (req, res) => res.json(analytics.byDimension(req.params.dim, req.query)));
 api.get('/briefing', (req, res) => res.json(analytics.farmerBriefing()));
+
+/* ---- 农情：气象实况 / 施药窗口 / 三日预报 / 施药策略库 ---- */
+api.get('/weather', (req, res) => res.json({
+  ...currentWeather(),
+  forecast: weatherForecast(),
+  windScale: windScale(currentWeather().wind),
+}));
+
+api.get('/strategies', (req, res) => res.json({
+  strategies: SPRAY_STRATEGIES,
+  calendar: AGRO_CALENDAR,
+  windowRules: SPRAY_WINDOW_RULES,
+}));
+
+api.get('/strategies/:disease', (req, res) => {
+  const s = strategyFor(String(req.params.disease));
+  if (!s) return res.status(404).json({ error: '未匹配的病种策略' });
+  res.json(s);
+});
 
 api.get('/plan', (req, res) => {
   const opts = {};

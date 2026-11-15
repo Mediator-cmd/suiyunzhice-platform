@@ -1,16 +1,21 @@
-import React, { useMemo } from 'react';
-import { MapContainer, Polygon, Polyline, Marker, CircleMarker, Tooltip, Rectangle } from 'react-leaflet';
+import React, { useMemo, useEffect } from 'react';
+import { MapContainer, Polygon, Polyline, Marker, CircleMarker, Tooltip, Rectangle, ImageOverlay, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { MAP, DISEASE_COLOR } from '../theme.js';
+import { SATELLITE_BASEMAP } from '../assets.js';
 
 /**
  * 地块地图：本地 ENU 坐标 → Leaflet 的 CRS.Simple
- * 不用在线瓦片，保证离线/内网/演示环境都能渲染。
  *
- * 地图上标出三类具体信息：
+ * 不用在线瓦片，保证离线/内网/演示环境都能渲染。
+ * 但也叠了一层本地卫星实景图（ImageOverlay），
+ * 这样既有真实场景参照，又不依赖外网瓦片服务。
+ *
+ * 地图上标出四类具体信息：
  *  1) 5 m 作业网格（作业单位）
  *  2) A~H 八个管理区（把 200 m × 100 m 划成 50 m × 50 m 的作业分区）
  *  3) 障碍区（排水沟 / 配电房，带名称）
+ *  4) 比例尺（1 格 = 5 m / 10 m / 20 m，与网格尺度对齐）
  * 设备用内联 SVG 画出无人机与机器人的具体形状，而不是一个圆点。
  */
 
@@ -48,7 +53,8 @@ const ROBOT_GLYPH = `
 </svg>`;
 
 export function FieldMap({
-  field, route, devices, detections, events, missions, height = 460, onGridClick, selectedGrid,
+  field, route, devices, detections, events, missions, height = 460,
+  onGridClick, selectedGrid, showBasemap = true,
 }) {
   if (!field) return null;
 
@@ -173,10 +179,21 @@ export function FieldMap({
         style={{ height: '100%', width: '100%', background: MAP.bg }}
         attributionControl={true}
       >
+        <FitBounds bounds={bounds} />
+
+        {/* 真实场景卫星底图：本地图片，不依赖外网瓦片 */}
+        {showBasemap && (
+          <ImageOverlay
+            url={SATELLITE_BASEMAP}
+            bounds={bounds}
+            opacity={0.42}
+          />
+        )}
+
         {/* 地块底色 */}
         <Polygon
           positions={[toLL(0, 0), toLL(field.widthM, 0), toLL(field.widthM, field.heightM), toLL(0, field.heightM)]}
-          pathOptions={{ color: MAP.fieldStroke, weight: 1.5, fillColor: MAP.fieldFill, fillOpacity: 0.95 }}
+          pathOptions={{ color: MAP.fieldStroke, weight: 1.5, fillColor: MAP.fieldFill, fillOpacity: showBasemap ? 0.18 : 0.95 }}
         />
 
         {/* 管理区划分：虚线框 + 角标字母 */}
@@ -292,7 +309,63 @@ export function FieldMap({
             </Tooltip>
           </Marker>
         ))}
+
+        <ScaleBar />
       </MapContainer>
+    </div>
+  );
+}
+
+/**
+ * 视图自适应：把地块边界铺满地图容器。
+ * CRS.Simple 下 bounds 不会自动 fit，手动调一次。
+ */
+function FitBounds({ bounds }) {
+  const map = useMap();
+  const done = React.useRef(false);
+  useEffect(() => {
+    if (done.current) return;
+    const t = setTimeout(() => {
+      try { map.fitBounds(bounds, { padding: [8, 8] }); done.current = true; } catch { /* ignore */ }
+    }, 0);
+    return () => clearTimeout(t);
+  }, [map, bounds]);
+  return null;
+}
+
+/**
+ * 比例尺。
+ *
+ * CRS.Simple 下 Leaflet 自带的 L.control.scale 算不出米数
+ * （它按墨卡托比例换算，而我们用的是 1 单位 = 1 米的局部 ENU）。
+ * 所以自己算：CRS.Simple 的投影比例是 2^zoom，即 1 米 = 2^zoom 像素，
+ * 于是 1 像素 = 1 / 2^zoom 米，取整成 5/10/20/50 m 的整数倍。
+ */
+function ScaleBar() {
+  const map = useMap();
+  const [len, setLen] = React.useState(null);
+
+  useEffect(() => {
+    const update = () => {
+      const z = map.getZoom();
+      const mPerPx = 1 / Math.pow(2, z);
+      // 目标：比例尺约 90 px 宽
+      const target = mPerPx * 90;
+      const nice = [5, 10, 20, 50, 100, 200];
+      const pick = nice.find(n => n >= target) || nice[nice.length - 1];
+      setLen({ meters: pick, px: Math.round(pick / mPerPx) });
+    };
+    update();
+    map.on('zoomend', update);
+    map.on('resize', update);
+    return () => { map.off('zoomend', update); map.off('resize', update); };
+  }, [map]);
+
+  if (!len) return null;
+  return (
+    <div className="map-scale">
+      <div className="map-scale-bar" style={{ width: len.px }} />
+      <span className="map-scale-text">{len.meters} m</span>
     </div>
   );
 }

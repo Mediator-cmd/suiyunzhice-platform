@@ -1,5 +1,6 @@
 import React from 'react';
 import { CHART } from '../theme.js';
+import { HARDWARE_PHOTOS } from '../assets.js';
 
 /**
  * 平台方案页 —— 对外展示用
@@ -187,6 +188,30 @@ export default function Planning() {
               <div className="small" style={{ fontWeight: 600, marginBottom: 4 }}>{t}</div>
               <div className="xs dim" style={{ lineHeight: 1.65 }}>{d}</div>
             </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 12 }}>
+        <h3>
+          自研硬件
+          <span className="tag">团队实物</span>
+          <span className="spacer" />
+          <span className="xs mute">植保无人机 · 地面监测机器人 · 边缘计算载荷</span>
+        </h3>
+        <p className="hint">
+          平台不是纯软件方案。空地两端设备均为团队自研，
+          机载与地面载荷的字段口径与 shared/schema.js 的数据契约逐项对应。
+        </p>
+        <div className="photo-strip">
+          {HARDWARE_PHOTOS.map(p => (
+            <figure key={p.title} className="photo-cell">
+              <img src={p.src} alt={p.title} loading="lazy" />
+              <figcaption>
+                <b>{p.title}</b>
+                <span>{p.desc}</span>
+              </figcaption>
+            </figure>
           ))}
         </div>
       </div>

@@ -18,6 +18,7 @@ const PAGES = [
   ['realtime',  '实时监控'],
   ['linkage',   '空地联动'],
   ['analytics', '数据分析'],
+  ['agro',      '农情策略'],
   ['planner',   '路径规划'],
   ['planning',  '平台方案'],
   ['farm',      '农户服务'],

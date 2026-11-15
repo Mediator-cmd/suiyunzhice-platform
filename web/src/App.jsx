@@ -4,18 +4,31 @@ import Overview from './pages/Overview.jsx';
 import Realtime from './pages/Realtime.jsx';
 import Linkage from './pages/Linkage.jsx';
 import Analytics from './pages/Analytics.jsx';
+import Agro from './pages/Agro.jsx';
 import Planner from './pages/Planner.jsx';
 import Planning from './pages/Planning.jsx';
 import Farm from './pages/Farm.jsx';
 import Architecture from './pages/Architecture.jsx';
 
+/**
+ * 板块设置（信息架构）
+ *
+ * 相对原「金穗卫士」平台的 15 个板块做了删改，取其精华去其糟粕：
+ *   保留 —— 实时监测（含实景与地图）、数据分析、施药决策（并入路径规划与农情策略）、
+ *           策略库（独立为「农情与策略」）、空地协同调度（即空地联动）
+ *   合并 —— 系统首页 + 指挥中心 + 病害识别 → 总览（KPI + 地块态势 + 作业单）
+ *           地面站 + 多机协同规划 + 航线与处方 → 路径规划（一个规划器统一算）
+ *   新增 —— 农情与策略（气象、施药窗口、药剂与安全间隔期、病种实拍图）
+ *   舍弃 —— 3D 实景、飘移仿真、病害推演、智能助手（演示性占位，无可验证结论）
+ */
 const NAV = [
-  { id: 'overview',  label: '总览',     sub: '平台全局指标' },
-  { id: 'realtime',  label: '实时监控', sub: '传输与链路质量' },
-  { id: 'linkage',   label: '空地联动', sub: '三者实时协同' },
+  { id: 'overview',  label: '总览',     sub: '平台全局指标与地块态势' },
+  { id: 'realtime',  label: '实时监控', sub: '现场实景、链路质量与气象条件' },
+  { id: 'linkage',   label: '空地联动', sub: '三者实时协同闭环' },
   { id: 'analytics', label: '数据分析', sub: '六维统计与结论' },
-  { id: 'planner',   label: '路径规划', sub: '自动规划与比例' },
-  { id: 'planning',  label: '平台方案', sub: '能力与接入协议' },
+  { id: 'agro',      label: '农情策略', sub: '气象、施药窗口与策略库' },
+  { id: 'planner',   label: '路径规划', sub: '自动规划与比例求解' },
+  { id: 'planning',  label: '平台方案', sub: '能力、硬件与接入协议' },
   { id: 'farm',      label: '农户服务', sub: '今日行动清单' },
   { id: 'arch',      label: '系统架构', sub: '场景与流程图' },
 ];
@@ -132,7 +145,7 @@ export default function App() {
 
   const Page = {
     overview: Overview, realtime: Realtime, linkage: Linkage,
-    analytics: Analytics, planner: Planner, planning: Planning,
+    analytics: Analytics, agro: Agro, planner: Planner, planning: Planning,
     farm: Farm, arch: Architecture,
   }[page];
 

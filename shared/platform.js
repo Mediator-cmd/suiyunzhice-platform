@@ -10,6 +10,7 @@
 import {
   DISEASES, ANALYTICS_DIMENSIONS, DEVICE_STATES, PLAN_OBJECTIVES, SPRAY_RATIO_NOTE,
 } from './schema.js';
+import { SPRAY_STRATEGIES, SPRAY_WINDOW_RULES } from './agronomy.js';
 import { Field, autoPlan, manualBaseline, compareWithManual } from './planner.js';
 
 /** 天津宁河东棘坨镇示范田 —— 200m × 100m = 2 ha，5m × 5m 网格 */
@@ -101,6 +102,9 @@ export class Platform {
       objectives: PLAN_OBJECTIVES,
       sprayRatio: SPRAY_RATIO_NOTE,
       states: DEVICE_STATES,
+      // 施药策略库与施药窗口判据 —— 从原平台提炼，改为随元数据一起下发
+      strategies: SPRAY_STRATEGIES,
+      sprayWindowRules: SPRAY_WINDOW_RULES,
     };
   }
 }
