@@ -4,7 +4,6 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid,
 } from 'recharts';
 import { FieldMap } from '../components/FieldMap.jsx';
-import { chainLabel } from './Overview.jsx';
 import {
   IconScan, IconDispatch, IconRobot, IconConfirm, IconSpray,
 } from '../components/Icons.jsx';

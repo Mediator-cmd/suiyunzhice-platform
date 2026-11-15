@@ -1,5 +1,4 @@
 import React from 'react';
-import { CHART } from '../theme.js';
 
 /**
  * 空地协同作业场景示意图

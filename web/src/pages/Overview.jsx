@@ -198,7 +198,7 @@ export default function Overview({ meta, devices, telemetry, detections, events,
   );
 }
 
-export function chainLabel(c) {
+function chainLabel(c) {
   return {
     uav_detect: '空中发现',
     cloud_dispatch: '云端派单',
