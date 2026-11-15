@@ -124,6 +124,9 @@ const API_ROWS = [
   ['GET', '/api/analytics/overview', '总览 KPI'],
   ['GET', '/api/analytics/{dim}', '六维分析：spatial/temporal/disease/platform/task/environment'],
   ['GET', '/api/briefing', '农户简报'],
+  ['GET', '/api/weather', '气象实况 + 施药窗口判定 + 三日预报'],
+  ['GET', '/api/strategies', '施药策略库 / 农事历 / 窗口判据'],
+  ['GET', '/api/strategies/{disease}', '按病种取策略'],
   ['GET', '/api/plan', '自动规划结果（可带 weights=经济,快速,环保）'],
   ['POST', '/api/plan/ratio', '速度-喷洒比例求解'],
   ['POST', '/api/plan/simulate', '人工航线基线模拟'],
@@ -230,7 +233,7 @@ export default function Planning() {
         </div>
 
         <div className="card">
-          <h3>接口清单 <span className="tag">18 个</span></h3>
+          <h3>接口清单 <span className="tag">{API_ROWS.length} 个</span></h3>
           <p className="hint">设备接入与前端订阅共用同一套数据契约，接口语义对设备开发者友好。</p>
           <div className="table-scroll" style={{ maxHeight: 460 }}>
             <table className="tbl">

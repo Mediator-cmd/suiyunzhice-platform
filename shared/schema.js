@@ -6,12 +6,12 @@
 
 /** 作物与病害字典 */
 export const DISEASES = [
-  { code: 'rust',        name: '锈病',     latin: 'Puccinia spp.',  mainPart: '叶片', severityHint: '叶部橙褐色孢子堆' },
-  { code: 'powdery',     name: '白粉病',   latin: 'Blumeria graminis', mainPart: '叶片', severityHint: '白色粉层' },
-  { code: 'loose_smut',  name: '散黑穗病', latin: 'Sphacelotheca reiliana', mainPart: '穗部', severityHint: '黑色穗粒' },
-  { code: 'root_rot',    name: '根腐病',   latin: 'Rhizoctonia solani', mainPart: '根茎部', severityHint: '茎基褐变' },
-  { code: 'fusarium',    name: '赤霉病',   latin: 'Fusarium graminearum', mainPart: '穗部', severityHint: '穗部霉层' },
-  { code: 'leaf_blight', name: '叶枯病',   latin: 'Septoria tritici', mainPart: '叶片', severityHint: '叶片早衰斑' },
+  { code: 'rust',        name: '锈病',     latin: 'Puccinia spp.',  mainPart: '叶片', severityHint: '叶部橙褐色孢子堆', window: '初发期即抢防，7–10 天复查' },
+  { code: 'powdery',     name: '白粉病',   latin: 'Blumeria graminis', mainPart: '叶片', severityHint: '白色粉层', window: '轻症物理防治，重症三唑酮' },
+  { code: 'loose_smut',  name: '散黑穗病', latin: 'Sphacelotheca reiliana', mainPart: '穗部', severityHint: '黑色穗粒', window: '播种期拌种，拔节期无法补救' },
+  { code: 'root_rot',    name: '根腐病',   latin: 'Rhizoctonia solani', mainPart: '根茎部', severityHint: '茎基褐变', window: '近地确认后结合墒情评估' },
+  { code: 'fusarium',    name: '赤霉病',   latin: 'Fusarium graminearum', mainPart: '穗部', severityHint: '穗部霉层', window: '显症即抢防，单独标记区域' },
+  { code: 'leaf_blight', name: '叶枯病',   latin: 'Septoria tritici', mainPart: '叶片', severityHint: '叶片早衰斑', window: '作为长势指标，慎用农药' },
 ];
 
 /** 设备类型 */

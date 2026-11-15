@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { FieldMap } from '../components/FieldMap.jsx';
 
 export default function Farm({ meta, briefing, detections, devices, events, missions }) {
@@ -9,6 +9,13 @@ export default function Farm({ meta, briefing, detections, devices, events, miss
     byDisease.set(d.disease, (byDisease.get(d.disease) || 0) + 1);
   }
   const sprayMissions = (missions || []).filter(m => m.type === 'spray');
+
+  // 病种名称与防治窗口统一取自 shared/schema.js 的病种字典，
+  // 不在本页再维护一份 —— 避免两处口径不一致。
+  const diseaseMeta = useMemo(
+    () => Object.fromEntries((meta?.diseases || []).map(d => [d.code, d])),
+    [meta]
+  );
 
   return (
     <>
@@ -55,9 +62,9 @@ export default function Farm({ meta, briefing, detections, devices, events, miss
             <tbody>
               {Array.from(byDisease.entries()).sort((a, b) => b[1] - a[1]).map(([code, n]) => (
                 <tr key={code}>
-                  <td>{DISEASE_NAME[code] || code}</td>
+                  <td>{diseaseMeta[code]?.name || code}</td>
                   <td className="num">{n}</td>
-                  <td className="xs dim">{WINDOW[code] || '—'}</td>
+                  <td className="xs dim">{diseaseMeta[code]?.window || '—'}</td>
                 </tr>
               ))}
               {byDisease.size === 0 && <tr><td colSpan={3}><div className="empty">暂无检出</div></td></tr>}
@@ -101,17 +108,3 @@ export default function Farm({ meta, briefing, detections, devices, events, miss
     </>
   );
 }
-
-const DISEASE_NAME = {
-  rust: '锈病', powdery: '白粉病', loose_smut: '散黑穗病',
-  root_rot: '根腐病', fusarium: '赤霉病', leaf_blight: '叶枯病',
-};
-
-const WINDOW = {
-  rust: '初发期即抢防，7–10 天复查',
-  powdery: '轻症物理防治，重症三唑酮',
-  loose_smut: '播种期拌种，拔节期无法补救',
-  root_rot: '近地确认后结合墒情评估',
-  fusarium: '显症即抢防，单独标记区域',
-  leaf_blight: '作为长势指标，慎用农药',
-};

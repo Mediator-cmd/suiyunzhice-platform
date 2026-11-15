@@ -5,8 +5,11 @@ import {
   CartesianGrid, Legend, BarChart, Bar, Cell,
 } from 'recharts';
 import { FieldMap } from '../components/FieldMap.jsx';
-import { SCENE_PHOTOS, HARDWARE_PHOTOS } from '../assets.js';
+import { SCENE_PHOTOS } from '../assets.js';
 import { currentWeather, windScale } from '../../../shared/agronomy.js';
+
+// 按标题取图，不写死下标 —— 场景条增删时不会错位
+const sceneByTitle = t => SCENE_PHOTOS.find(p => p.title === t) || SCENE_PHOTOS[0];
 
 const STATE_LABEL = {
   offline: '离线', idle: '待机', takeoff: '起飞', surveying: '空中巡查',
@@ -115,7 +118,7 @@ export default function Realtime({ meta, devices, telemetry, linkMetrics, mode, 
         <div className="stack" style={{ gap: 16 }}>
           {/* 田间气象 —— 监控与作业条件放在一起，判断「此刻能不能飞」 */}
           <div className="card">
-            <h3>作业气象条件 <span className="tag">{w.weather}</span></h3>
+            <h3>作业气象条件 <span className="tag">模拟数据</span><span className="tag">{w.weather}</span></h3>
             <div className="grid g2" style={{ gap: 12, marginBottom: 12 }}>
               {[
                 ['气温', `${w.temperature} ℃`, w.temperature > 28 || w.temperature < 15 ? 'amber' : 'green'],
@@ -130,7 +133,7 @@ export default function Realtime({ meta, devices, telemetry, linkMetrics, mode, 
               ))}
             </div>
             <div className="xs dim">
-              蒲福风级 {windScale(w.wind).level} 级 {windScale(w.wind).name}。
+              蒲福风级 {windScale(w.wind).level} 级 {windScale(w.wind).name}（模拟读数）。
               {w.spray.suitable
                 ? '当前满足施药窗口，允许下发喷洒任务。'
                 : '当前不满足施药窗口，平台将拦截喷洒派工。'}
@@ -142,8 +145,8 @@ export default function Realtime({ meta, devices, telemetry, linkMetrics, mode, 
             <h3>现场画面 <span className="tag">机载多光谱 · 地面近距</span></h3>
             <div className="grid g2" style={{ gap: 8 }}>
               {[
-                { p: SCENE_PHOTOS[3], tag: '机载可见光' },
-                { p: SCENE_PHOTOS[4], tag: '地面近距' },
+                { p: sceneByTitle('植保无人机作业'), tag: '机载可见光' },
+                { p: sceneByTitle('地面机器人近距复核'), tag: '地面近距' },
               ].map(({ p, tag }) => (
                 <div key={tag} style={{ border: '1px solid var(--border)' }}>
                   <img src={p.src} alt={tag}

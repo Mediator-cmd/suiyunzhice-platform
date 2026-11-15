@@ -209,6 +209,11 @@ export const AGRO_CALENDAR = [
  *   - 同一天内读数平滑变化（像真实气象曲线，不像随机数跳动）
  *   - 跨天有周期性（昼夜温差）
  *   - 任何时候刷新页面，数字都自洽
+ *
+ * ⚠ 诚实性约定：这里没有接真实气象站/第三方气象 API，读数是**按日序与
+ * 时刻确定性派生**的模型值，用于演示与策略逻辑闭环。因此返回对象一律带
+ * `simulated: true`，界面必须原样标注「模拟」，不得以「实况」二字对外呈现。
+ * 接入真实数据源后，把 simulated 置 false 即可，界面标注自动切换。
  */
 export function currentWeather(now = Date.now()) {
   const d = new Date(now);
@@ -230,6 +235,7 @@ export function currentWeather(now = Date.now()) {
   const w = {
     location: FIELD_LOCATION,
     updatedAt: now,
+    simulated: true,
     temperature,
     humidity,
     wind,
@@ -262,6 +268,7 @@ export function weatherForecast(now = Date.now()) {
     const item = {
       date: `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
       weekday: i === 0 ? '今天' : names[d.getDay()],
+      simulated: true,
       tempHigh, tempLow, humidity: humid, wind,
       weather: rainy ? '小雨' : wmoFrom(cloud, humid),
       isRainy: rainy,

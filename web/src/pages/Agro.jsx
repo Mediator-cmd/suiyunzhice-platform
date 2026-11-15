@@ -57,11 +57,15 @@ export default function Agro({ detections, missions, meta }) {
       <div className="grid g-2-1" style={{ marginBottom: 12 }}>
         <div className="card">
           <h3>
-            田间气象实况
+            田间气象<span className="tag">模拟数据</span>
             <span className="tag">{w.location}</span>
             <span className="spacer" />
             <span className="xs mute">更新于 {new Date(w.updatedAt).toLocaleTimeString('zh-CN', { hour12: false })}</span>
           </h3>
+          <div className="xs mute" style={{ marginBottom: 12 }}>
+            本页气象为平台内置的确定性模拟读数（按日序与时刻派生），用于演示施药窗口的判定逻辑；
+            接入实测气象站数据后此处将自动切换为实况。
+          </div>
 
           <div className="grid g4" style={{ marginBottom: 16 }}>
             {[
@@ -126,7 +130,7 @@ export default function Agro({ detections, missions, meta }) {
             </div>
           </div>
 
-          <div className="xs" style={{ marginBottom: 8 }}><b>三日预报</b></div>
+          <div className="xs" style={{ marginBottom: 8 }}><b>三日预报</b><span className="xs mute">（模拟）</span></div>
           <table className="tbl">
             <thead>
               <tr><th>日期</th><th>天气</th><th className="right">温度</th><th className="right">风速</th><th>施药</th></tr>
@@ -244,6 +248,22 @@ export default function Agro({ detections, missions, meta }) {
                     alt={d.name}
                     style={{ width: '100%', height: 148, objectFit: 'cover', display: 'block' }}
                   />
+                  {ph.alt ? (
+                    <div style={{ display: 'flex', gap: 6, padding: '6px 6px 0' }}>
+                      <img
+                        src={ph.alt}
+                        alt={`${d.name} 图库对照`}
+                        title="同一病种的图库标准照，用于与团队实拍比对"
+                        style={{
+                          width: 64, height: 48, objectFit: 'cover',
+                          display: 'block', borderRadius: 3, border: '1px solid var(--border)',
+                        }}
+                      />
+                      <span className="xs mute" style={{ alignSelf: 'center' }}>
+                        图库标准照对照
+                      </span>
+                    </div>
+                  ) : null}
                   <div style={{ padding: '8px' }}>
                     <div className="row" style={{ gap: 6 }}>
                       <span style={{

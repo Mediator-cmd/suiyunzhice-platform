@@ -20,35 +20,42 @@ SCENES = [
     (os.path.join(SRC_JIN, "farm-satellite.jpg"), "field-satellite.jpg", 1600, 1600),
     (os.path.join(SRC_JIN, "field_wheat.jpg"), "field-wheat.jpg", 1400, 1400),
     (os.path.join(SRC_JIN, "wheat_close.jpg"), "wheat-close.jpg", 1200, 1200),
-    (os.path.join(SRC_JIN, "green_wheat.jpg"), "wheat-green.jpg", 1200, 1200),
-    (os.path.join(SRC_JIN, "wheat_field2.jpg"), "field-wheat-2.jpg", 1400, 1400),
     (os.path.join(SRC_JIN, "research_field.jpg"), "field-research.jpg", 1200, 1200),
     (os.path.join(SRC_JIN, "agri_drone.jpg"), "uav-field.jpg", 1200, 1200),
     (os.path.join(SRC_JIN, "drone_spray.jpg"), "uav-spray.jpg", 1200, 1200),
-    (os.path.join(SRC_JIN, "drone_flying.jpg"), "uav-flying.jpg", 1200, 1200),
     (os.path.join(SRC_JIN, "robot_ag.jpg"), "robot-field.jpg", 1200, 1200),
     (os.path.join(SRC_JIN, "spray_tractor.jpg"), "tractor-spray.jpg", 1200, 1400),
 ]
 
 DISEASES = [
     (os.path.join(SRC_JIN, "wm_rust.jpg"), "dis-rust.jpg", 900, 900),
-    (os.path.join(SRC_JIN, "wm_powdery.jpg"), "dis-powdery.jpg", 900, 1200),
     (os.path.join(SRC_JIN, "wm_powdery2.jpg"), "dis-powdery-b.jpg", 900, 900),
     (os.path.join(SRC_JIN, "wm_loosesmut.jpg"), "dis-loose-smut.jpg", 800, 1200),
     (os.path.join(SRC_JIN, "wm_rootrot.jpg"), "dis-root-rot.jpg", 900, 900),
     (os.path.join(SRC_JIN, "wm_fusarium.jpg"), "dis-fusarium.jpg", 700, 700),
     (os.path.join(SRC_JIN, "wm_leafblight.jpg"), "dis-leaf-blight.jpg", 900, 900),
+    # 团队在示范田自行拍摄的病叶实拍 —— 与平台识别的病种同源，优先于图库素材
+    (os.path.join(SRC_JIN, "锈病.jpg"), "dis-rust-field.jpg", 900, 900),
+    (os.path.join(SRC_JIN, "白粉病.jpg"), "dis-powdery-field.jpg", 900, 900),
 ]
 
+# 硬件照片 —— 全部来自团队自有的 _pool/ 实物拍摄
+#
+# 绑定依据：以申报书正文图注为权威参照，逐张人工核验画面内容。
+#   申报书 图6「植保无人机在麦田中低空巡检作业实拍」→ s20_52.png（低空航拍麦田）
+#   申报书 图7「地面监测机器人样机实拍（近距复核与图像采集单元）」→ s9_1.jpeg（样机整机）
+#                                                              → s9_2.png（手持采集单元）
+# 早期版本曾把 s9_1.jpeg 当成无人机、s20_52.png 当成机器人，导致图文张冠李戴，
+# 此处按内容而非文件名重新绑定。
 HARDWARE = [
-    (os.path.join(SRC_POOL, "s9_1.jpeg"), "hw-uav-1.jpg", 1400, 1400),
-    (os.path.join(SRC_POOL, "s20_52.png"), "hw-robot.jpg", 1200, 1200),
-    (os.path.join(SRC_POOL, "s10_2.png"), "hw-uav-2.jpg", 1200, 1200),
-    (os.path.join(SRC_POOL, "s26_5.png"), "hw-board.jpg", 1000, 1000),
-    (os.path.join(SRC_POOL, "s26_19.png"), "hw-field-1.jpg", 1200, 1200),
-    (os.path.join(SRC_POOL, "s26_21.png"), "hw-field-2.jpg", 1000, 1400),
-    (os.path.join(SRC_POOL, "s14_9.png"), "hw-detail.jpg", 900, 900),
-    (os.path.join(SRC_POOL, "s10_13.png"), "hw-uav-3.jpg", 1000, 1000),
+    (os.path.join(SRC_POOL, "s20_52.png"), "hw-uav-1.jpg", 1200, 1200),     # 植保无人机低空巡检
+    (os.path.join(SRC_POOL, "s10_2.png"), "hw-uav-2.jpg", 1200, 1200),      # 飞控与载荷
+    (os.path.join(SRC_POOL, "s10_13.png"), "hw-uav-3.jpg", 1000, 1000),     # 喷头模组
+    (os.path.join(SRC_POOL, "s9_1.jpeg"), "hw-robot.jpg", 1400, 1400),     # 地面监测机器人样机
+    (os.path.join(SRC_POOL, "s9_2.png"), "hw-robot-unit.jpg", 1000, 1000),  # 机器人图像采集单元
+    (os.path.join(SRC_POOL, "s26_5.png"), "hw-board.jpg", 1000, 1000),      # 边缘计算板
+    (os.path.join(SRC_POOL, "s26_19.png"), "hw-field-1.jpg", 1200, 1200),   # 现场调试
+    (os.path.join(SRC_POOL, "s26_21.png"), "hw-field-2.jpg", 1000, 1400),  # 样机联调
 ]
 
 

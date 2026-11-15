@@ -4,6 +4,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip,
   CartesianGrid, Legend, PieChart, Pie, Cell, AreaChart, Area, LineChart, Line,
 } from 'recharts';
+import { DISEASES } from '../../../shared/schema.js';
 
 const COLORS = CHART.series;
 
@@ -356,10 +357,12 @@ function EnvironmentView({ data }) {
 }
 
 /* ---------------- helpers ---------------- */
+// 病种名直接取自 shared/schema.js 的病种字典 —— 单一数据源，
+// 不在本页再维护第二份名称表。
+const DISEASE_NAME = Object.fromEntries(DISEASES.map(d => [d.code, d.name]));
 function diseaseName(code) {
   if (!code) return '—';
-  return ({ rust: '锈病', powdery: '白粉病', loose_smut: '散黑穗病',
-    root_rot: '根腐病', fusarium: '赤霉病', leaf_blight: '叶枯病' })[code] || code;
+  return DISEASE_NAME[code] || code;
 }
 function partLabel(p) {
   return ({ canopy: '冠层', leaf: '叶面', underside: '叶下', stem: '根茎部', soil: '土壤' })[p] || p;

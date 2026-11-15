@@ -351,7 +351,7 @@ export class Analytics {
       generatedAt: Date.now(),
       headline: `当前全场检出 ${ov.detection.total} 处疑似病斑，确认 ${ov.detection.confirmed} 处，待派单 ${ov.mission.pending} 单`,
       kpis: [
-        { label: '平均识别置信度', value: `${(ov.detection.avgConfidence * 100).toFixed(1)}%`, sub: `识别准确率约 ${(ov.detection.avgConfidence * 100).toFixed(0)}%` },
+        { label: '平均识别置信度', value: `${(ov.detection.avgConfidence * 100).toFixed(1)}%`, sub: `模型对本次判定的自评分，非准确率` },
         { label: '误检率', value: '6.0%', sub: '计划书实测口径' },
         { label: '联动闭环平均时延', value: `${(ov.linkage.avgLatencyMs / 1000).toFixed(1)} s`, sub: `P95 ${(ov.linkage.p95LatencyMs / 1000).toFixed(1)} s` },
         { label: '药液节约率', value: ov.efficiency.savedRatio == null ? '待作业' : `${ov.efficiency.savedRatio}%`, sub: ov.efficiency.savedRatio == null ? '尚无喷洒任务' : `累计节约 ${ov.efficiency.savedVolumeL} L` },
