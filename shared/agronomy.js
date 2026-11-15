@@ -189,8 +189,8 @@ export function judgeSprayWindow(w) {
  * 三、气象实况与三日预报
  * ================================================================== */
 
-/** 示范田位置（天津宁河东棘坨镇） */
-export const FIELD_LOCATION = '天津宁河 · 东棘坨镇 · 穗云智策示范田';
+/** 示范田位置（河北省唐山市，30 亩）—— 与申报书、试验田合作协议口径一致 */
+export const FIELD_LOCATION = '河北唐山 · 30 亩示范田 · 穗云智策';
 
 /** 二十四节气与农事窗口 —— 用于「农情」板块 */
 export const AGRO_CALENDAR = [

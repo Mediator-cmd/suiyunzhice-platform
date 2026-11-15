@@ -13,11 +13,18 @@ import {
 import { SPRAY_STRATEGIES, SPRAY_WINDOW_RULES } from './agronomy.js';
 import { Field, autoPlan, manualBaseline, compareWithManual } from './planner.js';
 
-/** 天津宁河东棘坨镇示范田 —— 200m × 100m = 2 ha，5m × 5m 网格 */
+/**
+ * 河北省唐山市 30 亩示范田 —— 200m × 100m = 20000 m² = 30 亩 = 2 ha，
+ * 5m × 5m 网格。
+ *
+ * 地点口径以申报书为准：项目已与河北省唐山市 30 亩试验田签订合作，
+ * 平台展示的示范田就是这块田。此前初版平台曾写作「天津宁河东棘坨镇」，
+ * 与申报书与合作协议不符，已按申报书统一。
+ */
 export function defaultField() {
   return new Field({
     id: 'FLD-DJL-01',
-    name: '天津宁河东棘坨镇示范田',
+    name: '河北省唐山市 30 亩示范田',
     widthM: 200, heightM: 100,          // 2 ha
     gridRows: 20, gridCols: 40,         // 5m × 5m 网格
     obstacles: [

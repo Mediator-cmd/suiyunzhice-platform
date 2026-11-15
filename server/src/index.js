@@ -41,7 +41,7 @@ const SIM = process.env.SIM !== '0';
 
 const store = new Store(DB_PATH);
 
-// ---- 地块定义：天津宁河东棘坨镇示范田 ----
+// ---- 地块定义：河北省唐山市 30 亩示范田 ----
 const FIELD = defaultField();
 const platform = new Platform({ store, field: FIELD });
 
