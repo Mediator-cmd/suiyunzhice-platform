@@ -16,9 +16,7 @@ import fieldSatellite from './assets/scene/field-satellite.jpg';
 import fieldWheat from './assets/scene/field-wheat.jpg';
 import wheatClose from './assets/scene/wheat-close.jpg';
 import fieldResearch from './assets/scene/field-research.jpg';
-import uavField from './assets/scene/uav-field.jpg';
 import uavSpray from './assets/scene/uav-spray.jpg';
-import robotField from './assets/scene/robot-field.jpg';
 import tractorSpray from './assets/scene/tractor-spray.jpg';
 
 import disRust from './assets/disease/dis-rust.jpg';
@@ -93,13 +91,24 @@ export const DISEASE_PHOTOS = {
   },
 };
 
-/** 真实场景照片：用于「现场实景」条带 */
+/**
+ * 真实场景照片：用于「现场实景」条带
+ *
+ * 说明：
+ *   早期版本这里放的是原「金穗卫士」平台自带的无人机 / 机器人照片
+ *   （uav-field.jpg、robot-field.jpg），图注写着「植保无人机作业」
+ *   「地面机器人近距复核」，但画面里并不是本团队的样机——
+ *   评审时一眼就会被问穿。已全部换成本团队自有实拍：
+ *   植保无人机与地面机器人的画面直接引用 HARDWARE_PHOTOS 里的
+ *   团队样机照片，与申报书 图6 / 图7 完全一致，
+ *   其余位置只保留麦田、卫星图、喷洒作业等场景类照片。
+ */
 export const SCENE_PHOTOS = [
   { src: fieldSatellite, title: '示范田卫星实景', desc: '200 m × 100 m 作业地块，5 m 网格全覆盖' },
   { src: fieldWheat, title: '冬小麦大田', desc: '抽穗期冠层，高度约 80–110 cm' },
   { src: wheatClose, title: '麦穗近景', desc: 'SAN-GAT-RL 模型的空中识别目标' },
-  { src: uavField, title: '植保无人机作业', desc: '自主巡航、识别与喷洒一体化' },
-  { src: robotField, title: '地面机器人近距复核', desc: '叶下、根茎、土壤三工位补拍' },
+  { src: hwUav1, title: '植保无人机作业', desc: '低空巡航，识别与喷洒一体化' },
+  { src: hwRobot, title: '地面机器人近距复核', desc: '叶下、根茎、土壤三工位补拍' },
   { src: uavSpray, title: '靶向喷洒', desc: '1 m 窄幅喷头，只对病灶格喷洒' },
   { src: tractorSpray, title: '地面植保对照', desc: '传统整田均匀喷施，浪费显著' },
   { src: fieldResearch, title: '示范田试验区', desc: '不同品种与处理小区对照' },

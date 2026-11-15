@@ -16,14 +16,18 @@ SRC_POOL = r"E:\挑战杯\大创\_pool"
 DST = r"E:\挑战杯\_大创平台\web\src\assets"
 
 # (源文件, 目标名, 最大宽度, 最大高度)
+#
+# 注意：这里**不再**处理原平台自带的无人机 / 机器人照片
+# （agri_drone.jpg → uav-field.jpg、robot_ag.jpg → robot-field.jpg）。
+# 它们画面里不是本团队的样机，挂在「植保无人机作业」「地面机器人近距复核」
+# 图注下会被评审当场问穿。改用团队自有实拍（见下方 HARDWARE），
+# 前端 SCENE_PHOTOS 直接引用 HARDWARE_PHOTOS 的图，两条带一致。
 SCENES = [
     (os.path.join(SRC_JIN, "farm-satellite.jpg"), "field-satellite.jpg", 1600, 1600),
     (os.path.join(SRC_JIN, "field_wheat.jpg"), "field-wheat.jpg", 1400, 1400),
     (os.path.join(SRC_JIN, "wheat_close.jpg"), "wheat-close.jpg", 1200, 1200),
     (os.path.join(SRC_JIN, "research_field.jpg"), "field-research.jpg", 1200, 1200),
-    (os.path.join(SRC_JIN, "agri_drone.jpg"), "uav-field.jpg", 1200, 1200),
     (os.path.join(SRC_JIN, "drone_spray.jpg"), "uav-spray.jpg", 1200, 1200),
-    (os.path.join(SRC_JIN, "robot_ag.jpg"), "robot-field.jpg", 1200, 1200),
     (os.path.join(SRC_JIN, "spray_tractor.jpg"), "tractor-spray.jpg", 1200, 1400),
 ]
 

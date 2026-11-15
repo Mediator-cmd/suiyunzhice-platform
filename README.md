@@ -85,7 +85,7 @@ bash deploy/deploy.sh pages     # 构建并推送到 GitHub Pages
 ### 方案 A：GitHub Pages（推荐，最快拿到可提交链接）
 
 前端是纯静态站，且 **`shared/` 内核在浏览器里直接运行** —— 即使后端未部署，
-全部 8 个页面（含路径规划、速度-喷洒比例求解）依然完整可用，只是数据来自内置模拟器
+全部 9 个页面（含路径规划、速度-喷洒比例求解）依然完整可用，只是数据来自内置模拟器
 而非真实设备。页面右上角会显示「演示模式」。
 
 1. `bash deploy/deploy.sh pages`（或手动把 `web/dist` 推到 `gh-pages` 分支）
@@ -172,6 +172,9 @@ bash deploy/deploy.sh tunnel
 | GET | `/api/analytics/overview` | 总览 KPI |
 | GET | `/api/analytics/{dim}` | 六维分析 |
 | GET | `/api/briefing` | 农户简报 |
+| GET | `/api/weather` | 气象实况 + 施药窗口判定 + 三日预报 |
+| GET | `/api/strategies` | 施药策略库 / 农事历 / 窗口判据 |
+| GET | `/api/strategies/{disease}` | 按病种取策略 |
 | GET | `/api/plan` | 自动规划结果（`?mode=full\|target&weights=经济,快速,环保`） |
 | POST | `/api/plan/ratio` | 速度-喷洒比例求解 |
 | POST | `/api/plan/simulate` | 人工航线基线模拟 |
