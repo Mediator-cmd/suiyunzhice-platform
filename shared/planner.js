@@ -482,6 +482,11 @@ export function scoreRoute(route, ratio, weights = { economy: 0.4, speed: 0.35, 
       areaHa: round(route.regionAreaHa, 3),
       coveredAreaHa: round(route.coveredAreaHa, 3),
       nLines: route.nLines,
+      // 靶向模式专属：覆盖率与溢出面积 —— 申报材料引用的「覆盖率 1.0、溢出 0」即此两值
+      targetCoverage: route.targetCoverage ?? null,
+      spillAreaHa: route.spillAreaHa ?? null,
+      nTargetCells: route.nTargetCells ?? null,
+      nClusters: route.nClusters ?? null,
       // 与人工基线对比用的扁平字段
       minutes: round(energy.totalMinutes, 2),
       volumeL: ratio.totalVolumeL,

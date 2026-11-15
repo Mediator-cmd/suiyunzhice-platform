@@ -167,6 +167,23 @@ export default function Planner({ meta }) {
                   </div>
                 ))}
               </div>
+
+              {/* 靶向模式专属指标：覆盖率与溢出 —— 申报材料引用的就是这两项 */}
+              {mode === 'target' && best.score.detail.targetCoverage != null && (
+                <div className="grid g4" style={{ marginTop: 12 }}>
+                  {[
+                    ['靶向网格', `${best.score.detail.nTargetCells} 格 / ${best.score.detail.nClusters} 簇`],
+                    ['靶向覆盖率', best.score.detail.targetCoverage.toFixed(2)],
+                    ['溢出面积', `${best.score.detail.spillAreaHa} ha`],
+                    ['喷洒面积', `${best.score.detail.coveredAreaHa} ha`],
+                  ].map(([l, v]) => (
+                    <div className="kpi" key={l}>
+                      <span className="label">{l}</span>
+                      <span className="mono" style={{ fontSize: 17 }}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </div>
