@@ -673,16 +673,46 @@ function clusterCells(cells, cw, ch) {
  * 服务端（Node + SQLite）与浏览器（静态演示）共用本函数，
  * 保证两边生成的作业单完全一致。
  */
+/**
+ * 生成一条靶向点喷作业单。
+ *
+ * 关键：只喷确诊的病灶格（cells），不喷整个管理分区。
+ * 早期版本用 mode:'zone' 把整个分区均匀喷一遍 —— 那不是「靶向点喷」，
+ * 与申报书「先发现再打药」的主张矛盾，且节药基准无法自洽。
+ * 现在改为 mode:'target'，cells 为空时退化为该分区内的全部网格。
+ */
 export function buildSprayMission({
   field, zoneId, headingDeg = 90, speedMs = 6, swathM = 1.0,
   targetDoseLha = 12, disease = null, cells = [], agent = '戊唑醇·苯醚甲环唑',
 }) {
+  // 靶向网格：优先用确诊格；没有则退化为该分区全部网格
+  const zone = field.zones().find(z => z.id === zoneId);
+  let targetCells = (cells || []).filter(c => c && Number.isInteger(c.row) && Number.isInteger(c.col));
+  if (!targetCells.length && zone) {
+    const { r0, r1, c0, c1 } = zone.gridRange;
+    targetCells = [];
+    for (let r = r0; r < r1; r++) {
+      for (let c = c0; c < c1; c++) targetCells.push({ row: r, col: c });
+    }
+  }
+
   const route = generateSprayRoute(field, {
-    mode: 'zone', zoneId, headingDeg, speedMs, swathM, targetDoseLha,
+    mode: 'target', headingDeg, speedMs, swathM, targetDoseLha, targetCells,
   });
   const ratio = solveSprayRatio(route, { swathM, speedMs, targetDoseLha });
   const score = scoreRoute(route, ratio);
-  const zone = field.zones().find(z => z.id === zoneId);
+
+  // 节药基准（两个口径，分开陈述，不要混用）：
+  //   ① 分区口径：本作业所在的整个管理分区若均匀喷洒，需要多少药。
+  //      这才是农户真正在比较的：「整块地都打」vs「只打有病的地方」。
+  //   ② 全田口径：全田若均匀喷洒，需要多少药（申报书 25.2 L vs 0.57 L 用的就是这个）。
+  // 注意：② 是「全田基准只算一次」的量，逐单相加会重复计算，
+  //      所以逐单只记 ①，全田汇总由 spraySavingRatio 统一出数。
+  const targetAreaHa = targetCells.length * field.cellAreaHa;
+  const zoneAreaHa = zone ? zone.areaHa : field.totalAreaHa();
+  const uniformZoneL = zoneAreaHa * targetDoseLha;
+  const uniformWholeFieldL = field.totalAreaHa() * targetDoseLha;
+  const savedVsZoneL = uniformZoneL - ratio.totalVolumeL;
 
   return {
     route,
@@ -695,8 +725,8 @@ export function buildSprayMission({
       zoneId,
       zoneName: `${zoneId} 区`,
       target: {
-        grid: cells.length ? cells[0] : { row: zone.gridRange.r0, col: zone.gridRange.c0 },
-        cells,
+        grid: targetCells.length ? targetCells[0] : { row: 0, col: 0 },
+        cells: targetCells,
         zone: zoneId,
       },
       spray: {
@@ -711,15 +741,26 @@ export function buildSprayMission({
         speedRange: ratio.speedRange,
       },
       plan: {
-        algo: '航向×速度×喷幅联合搜索（三目标打分）',
+        algo: '航向×速度×喷幅联合搜索（三目标打分）· 靶向点喷',
         length: route.totalLengthM,
         estMinutes: score.detail.totalMinutes,
         estVolumeL: ratio.totalVolumeL,
         ecoScore: score.eco,
         zoneId,
-        // 相对整田均匀喷施的节药量
-        savedVsUniformL: round(
-          (field.totalAreaHa() * targetDoseLha) - ratio.totalVolumeL, 2),
+        // 靶向网格数与簇数（申报书「识别结果—地块—坐标—任务」可追溯的关键字段）
+        targetCells: targetCells.length,
+        targetClusters: route.nClusters ?? 0,
+        targetAreaHa: round(targetAreaHa, 4),
+        targetCoverage: route.targetCoverage,
+        spillAreaHa: route.spillAreaHa,
+        // 分区口径节药：「整块地都打」vs「只打有病的地方」
+        zoneAreaHa: round(zoneAreaHa, 4),
+        uniformZoneL: round(uniformZoneL, 2),
+        savedVsZoneL: round(savedVsZoneL, 2),
+        savedRatioVsZone: uniformZoneL > 0
+          ? round(Math.max(0, (savedVsZoneL / uniformZoneL) * 100), 1) : 0,
+        // 全田口径节药（保留，供跨口径汇总；不可逐单相加）
+        savedVsUniformL: round(uniformWholeFieldL - ratio.totalVolumeL, 2),
       },
       status: 'pending',
     },
@@ -729,8 +770,13 @@ export function buildSprayMission({
 /**
  * 相对「整田均匀喷施」的药液节约率。
  *
- * 口径：整田均匀喷施 = 全田面积 × 目标施药量；
- *       精准靶向 = 实际喷洒面积 × 目标施药量。
+ * 口径（必须与作业单自洽）：
+ *   整田均匀喷施 = 全田面积 × 目标施药量 —— 只算一次，不是每单都算一遍；
+ *   精准靶向     = 全部喷洒任务实际药耗之和。
+ * 早期版本每条作业单都按「全田 24 L」记一次节药量，4 单就变成 84 L，
+ * 而按全田口径实际只省 12 L（50%）—— 同一屏上两个数字差 7 倍。
+ * 现在统一为：全田基准只算一次，逐单节药量改用「同范围均匀喷洒」基准。
+ *
  * 只有存在喷洒任务时才有意义，否则返回 null（平台显示「待作业」而非编造数字）。
  */
 export function spraySavingRatio(missions, field, targetDoseLha = 12) {
@@ -740,11 +786,23 @@ export function spraySavingRatio(missions, field, targetDoseLha = 12) {
   if (uniformL <= 0) return null;
   const preciseL = sprays.reduce((a, m) => a + (m.plan?.estVolumeL || 0), 0);
   if (preciseL <= 0) return null;
+
+  // 分区口径：每单所在分区若均匀喷洒需要多少药（这些分区互不重叠，可相加）
+  const zoneUniformL = sprays.reduce(
+    (a, m) => a + (m.plan?.uniformZoneL ?? 0), 0);
+  const zoneSavedL = sprays.reduce(
+    (a, m) => a + (m.plan?.savedVsZoneL ?? 0), 0);
+
   return {
     uniformL: round(uniformL, 2),
     preciseL: round(preciseL, 2),
     savedL: round(uniformL - preciseL, 2),
     savedRatio: round(Math.max(0, (1 - preciseL / uniformL) * 100), 1),
+    // 分区口径：靶向点喷相对「这些分区整体均匀喷洒」的节约
+    zoneUniformL: round(zoneUniformL, 2),
+    zoneSavedL: round(zoneSavedL, 2),
+    savedRatioVsZone: zoneUniformL > 0
+      ? round(Math.max(0, (zoneSavedL / zoneUniformL) * 100), 1) : 0,
     sprayTasks: sprays.length,
   };
 }

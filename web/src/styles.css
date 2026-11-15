@@ -22,6 +22,8 @@
 
   /* ---------- 文字：非彩色一律黑色，靠字号与字重分层 ---------- */
   --text: #000000;
+  /* dim 与 mute 同为黑色：设计约束第 5 条「非彩色文字统一黑色加粗」。
+     层级差异靠字号与字重表达，不用灰度。 */
   --text-dim: #000000;
   --text-mute: #000000;
 
@@ -176,6 +178,8 @@ a { color: var(--accent-2); text-decoration: none; }
 .kpi .sub { font-size: 12.5px; color: var(--text); font-weight: 600; }
 
 /* ---------- 表格 ---------- */
+.tbl-wrap { width: 100%; overflow-x: auto; }
+.tbl-wrap > table.tbl { min-width: 560px; }
 table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; font-weight: 600; }
 table.tbl th {
   text-align: left; padding: 8px 8px; color: var(--text);
@@ -531,4 +535,35 @@ label.lbl { font-size: 13.5px; color: var(--text); font-weight: 700; display: bl
 .arch-badge {
   display: inline-flex; align-items: center; padding: 4px 8px;
   border: 1.5px solid; font-size: 13px; font-weight: 700;
+}
+
+/* ============================================================================
+   网格档案抽屉：点击地图病害网格后展开的全链路追溯面板
+   ========================================================================== */
+.grid-detail {
+  margin-bottom: 12px;
+  padding: 12px 16px;
+  background: var(--panel-2);
+  border: 1px solid var(--accent);
+}
+.grid-detail-head {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 12px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.grid-detail-title {
+  font-size: 15px; font-weight: 700; color: var(--ink);
+  font-family: var(--mono); letter-spacing: .5px;
+}
+.grid-detail-kpis {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px; margin-bottom: 12px;
+}
+@media (max-width: 980px) {
+  .grid-detail-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.grid-detail-sec { margin-bottom: 10px; }
+.grid-detail-sec-h {
+  font-size: 13px; font-weight: 700; color: var(--ink);
+  margin-bottom: 6px;
 }

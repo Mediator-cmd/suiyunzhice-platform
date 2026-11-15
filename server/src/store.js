@@ -75,6 +75,10 @@ export class Store {
    *   flow_per_speed 流量÷飞行速度 的比例锁
    *   duty_cycle    喷阀占空比
    *   saved_vs_uniform_l 相对整田均匀喷施节约的药量
+   * 靶向点喷专用（保证「识别结果—地块—坐标—任务」全链路可追溯）：
+   *   target_cells / target_clusters / target_area_ha
+   *   target_coverage / spill_area_ha
+   *   saved_vs_same_area_l / saved_ratio_vs_same_area
    */
   migrateMissions() {
     const cols = this.db.prepare(`PRAGMA table_info(missions)`).all().map(c => c.name);
@@ -84,6 +88,15 @@ export class Store {
       ['flow_per_speed', 'REAL'],
       ['duty_cycle', 'REAL'],
       ['saved_vs_uniform_l', 'REAL'],
+      ['target_cells', 'INTEGER'],
+      ['target_clusters', 'INTEGER'],
+      ['target_area_ha', 'REAL'],
+      ['target_coverage', 'REAL'],
+      ['spill_area_ha', 'REAL'],
+      ['zone_area_ha', 'REAL'],
+      ['uniform_zone_l', 'REAL'],
+      ['saved_vs_zone_l', 'REAL'],
+      ['saved_ratio_vs_zone', 'REAL'],
     ];
     for (const [name, type] of add) {
       if (!cols.includes(name)) {
@@ -186,8 +199,10 @@ export class Store {
     this.db.prepare(`INSERT OR REPLACE INTO missions
       (mission_id,created_at,type,grid_row,grid_col,disease,speed,swath,flow,dose,agent,
        algo,length_m,est_minutes,est_volume_l,eco_score,status,cell_ids,
-       zone_id,zone_name,flow_per_speed,duty_cycle,saved_vs_uniform_l)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+       zone_id,zone_name,flow_per_speed,duty_cycle,saved_vs_uniform_l,
+       target_cells,target_clusters,target_area_ha,target_coverage,spill_area_ha,
+       zone_area_ha,uniform_zone_l,saved_vs_zone_l,saved_ratio_vs_zone)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(nz(m.missionId), nz(m.createdAt), nz(m.type), nz(m.target?.grid?.row),
         nz(m.target?.grid?.col), nz(m.disease),
         nz(m.spray?.speed), nz(m.spray?.swath), nz(m.spray?.flow),
@@ -199,7 +214,11 @@ export class Store {
         nz(m.status ?? 'pending'), JSON.stringify(m.target?.cells ?? []),
         nz(m.zoneId ?? m.target?.zone), nz(m.zoneName),
         nz(m.spray?.flowPerSpeed), nz(m.spray?.dutyCycle),
-        nz(m.plan?.savedVsUniformL));
+        nz(m.plan?.savedVsUniformL),
+        nz(m.plan?.targetCells), nz(m.plan?.targetClusters), nz(m.plan?.targetAreaHa),
+        nz(m.plan?.targetCoverage), nz(m.plan?.spillAreaHa),
+        nz(m.plan?.zoneAreaHa), nz(m.plan?.uniformZoneL),
+        nz(m.plan?.savedVsZoneL), nz(m.plan?.savedRatioVsZone));
   }
   updateMissionStatus(missionId, status) {
     this.db.prepare(`UPDATE missions SET status=? WHERE mission_id=?`).run(status, missionId);
@@ -216,6 +235,11 @@ export class Store {
         algo: r.algo, length: r.length_m, estMinutes: r.est_minutes,
         estVolumeL: r.est_volume_l, ecoScore: r.eco_score,
         savedVsUniformL: r.saved_vs_uniform_l,
+        targetCells: r.target_cells, targetClusters: r.target_clusters,
+        targetAreaHa: r.target_area_ha, targetCoverage: r.target_coverage,
+        spillAreaHa: r.spill_area_ha,
+        zoneAreaHa: r.zone_area_ha, uniformZoneL: r.uniform_zone_l,
+        savedVsZoneL: r.saved_vs_zone_l, savedRatioVsZone: r.saved_ratio_vs_zone,
       },
       status: r.status, cells: JSON.parse(r.cell_ids || '[]'),
       zoneId: r.zone_id ?? r.zone_name?.match(/^([A-Z])/)?.[1] ?? null,
@@ -241,6 +265,8 @@ export class Store {
       grid: { row: r.grid_row, col: r.grid_col }, disease: r.disease,
       latency: { sense: r.sense_ms, dispatch: r.dispatch_ms, act: r.act_ms, total: r.total_ms },
       closed: !!r.closed,
+      // 未闭环的原因：派单后地面复核证据尚未回传
+      pendingReason: r.closed ? null : '已派单复核，地面机器人尚未回传近距复核证据',
     }));
   }
 

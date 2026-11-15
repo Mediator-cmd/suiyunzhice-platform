@@ -173,6 +173,7 @@ export default function Architecture() {
         <div className="card">
           <h3>数据契约 <span className="tag">三端共用</span></h3>
           <p className="hint">四类消息在 shared/schema.js 中集中定义，三端引用同一份，避免字段漂移。</p>
+          <div className="tbl-wrap">
           <table className="tbl">
             <thead><tr><th>消息</th><th>方向</th><th>关键字段</th></tr></thead>
             <tbody>
@@ -186,10 +187,12 @@ export default function Architecture() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
 
         <div className="card">
           <h3>相比重构前解决了什么</h3>
+          <div className="tbl-wrap">
           <table className="tbl">
             <thead><tr><th>重构前</th><th>重构后</th></tr></thead>
             <tbody>
@@ -208,6 +211,7 @@ export default function Architecture() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </>

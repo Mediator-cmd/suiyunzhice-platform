@@ -36,6 +36,7 @@ export default function Linkage({ meta, devices, detections, events, overview })
       dispatch: Math.round(steps.dispatch / n),
       act: Math.round(steps.act / n),
       closed: evs.filter(e => e.closed).length,
+      pending: evs.filter(e => !e.closed).length,
       recheck: evs.filter(e => e.chain.includes('robot_recheck')).length,
     };
   }, [events]);
@@ -102,8 +103,13 @@ export default function Linkage({ meta, devices, detections, events, overview })
         <div className="card">
           <div className="kpi">
             <span className="label">闭环完成率</span>
-            <span className="value green">{stats ? ((stats.closed / stats.count) * 100).toFixed(1) : '—'}<span className="xs mute"> %</span></span>
-            <span className="sub">发起→确认→喷洒全链走通</span>
+            <span className={`value ${stats && stats.pending > 0 ? 'amber' : 'green'}`}>
+              {stats ? ((stats.closed / stats.count) * 100).toFixed(1) : '—'}<span className="xs mute"> %</span>
+            </span>
+            <span className="sub">
+              {stats ? `${stats.closed} 条已闭环` : '发起→确认→喷洒全链走通'}
+              {stats && stats.pending > 0 ? ` · ${stats.pending} 条待地面复核回传` : ''}
+            </span>
           </div>
         </div>
         <div className="card">
@@ -149,6 +155,7 @@ export default function Linkage({ meta, devices, detections, events, overview })
         <div className="card">
           <h3>联动触发判据</h3>
           <p className="hint">每条判据可追溯到具体事件，判据本身可配置。</p>
+          <div className="tbl-wrap">
           <table className="tbl">
             <thead><tr><th>判据</th><th>原因</th><th>动作</th></tr></thead>
             <tbody>
@@ -161,6 +168,7 @@ export default function Linkage({ meta, devices, detections, events, overview })
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
@@ -177,13 +185,18 @@ export default function Linkage({ meta, devices, detections, events, overview })
               <div className="empty">暂无联动事件</div>
             ) : (
               <table className="tbl">
-                <thead><tr><th>时间</th><th>网格</th><th>触发原因</th><th className="right">总时延</th></tr></thead>
+                <thead><tr><th>时间</th><th>网格</th><th>触发原因</th><th>闭环</th><th className="right">总时延</th></tr></thead>
                 <tbody>
                   {events.map(e => (
                     <tr key={e.eventId}>
                       <td className="mono xs mute nowrap">{new Date(e.ts).toLocaleTimeString('zh-CN', { hour12: false })}</td>
                       <td className="mono xs nowrap">R{e.grid.row}C{e.grid.col}</td>
                       <td className="xs dim" style={{ maxWidth: 190 }}>{e.trigger.reason}</td>
+                      <td>
+                        {e.closed
+                          ? <span className="pill ok">已闭环</span>
+                          : <span className="pill warn" title={e.pendingReason || ''}>待回传</span>}
+                      </td>
                       <td className="num">{(e.latency.total / 1000).toFixed(1)}s</td>
                     </tr>
                   ))}

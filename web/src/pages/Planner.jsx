@@ -278,6 +278,7 @@ export default function Planner({ meta }) {
           <h3>相比人工手画的提升</h3>
           {cmp && cmp.manual && (
             <>
+              <div className="tbl-wrap">
               <table className="tbl">
                 <thead><tr><th>指标</th><th className="right">人工</th><th className="right">自动</th><th className="right">改善</th></tr></thead>
                 <tbody>
@@ -300,6 +301,7 @@ export default function Planner({ meta }) {
                   ))}
                 </tbody>
               </table>
+              </div>
               <div className="xs mute" style={{ marginTop: 9 }}>
                 {cmp.manual.note}
               </div>

@@ -57,6 +57,7 @@ export default function Farm({ meta, briefing, detections, devices, events, miss
 
         <div className="card">
           <h3>病种分布速览</h3>
+          <div className="tbl-wrap">
           <table className="tbl">
             <thead><tr><th>病种</th><th className="right">检出</th><th>防治窗口</th></tr></thead>
             <tbody>
@@ -70,6 +71,7 @@ export default function Farm({ meta, briefing, detections, devices, events, miss
               {byDisease.size === 0 && <tr><td colSpan={3}><div className="empty">暂无检出</div></td></tr>}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
@@ -83,26 +85,44 @@ export default function Farm({ meta, briefing, detections, devices, events, miss
         {sprayMissions.length === 0 ? (
           <div className="empty">确诊病灶累积后自动派工，作业单会显示喷洒区、药剂与速度-喷洒比例</div>
         ) : (
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>喷洒区</th><th>药剂</th><th className="right">飞行速度</th>
-                <th className="right">喷洒流量</th><th className="right">药耗</th><th className="right">节药</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sprayMissions.map(m => (
-                <tr key={m.missionId}>
-                  <td><b>{m.zoneName || `${m.zoneId} 区`}</b></td>
-                  <td className="xs">{m.spray?.agent}</td>
-                  <td className="num">{m.spray?.speed} m/s</td>
-                  <td className="num">{m.spray?.flow} L/min</td>
-                  <td className="num">{m.plan?.estVolumeL} L</td>
-                  <td className="num"><span className="green">−{m.plan?.savedVsUniformL} L</span></td>
+          <>
+            <div className="tbl-wrap">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>喷洒区</th><th className="right">靶向格</th><th>药剂</th>
+                  <th className="right">飞行速度</th>
+                  <th className="right">喷洒流量</th><th className="right">药耗</th>
+                  <th className="right">分区整喷</th><th className="right">节药</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {sprayMissions.map(m => (
+                  <tr key={m.missionId}>
+                    <td><b>{m.zoneName || `${m.zoneId} 区`}</b></td>
+                    <td className="num">
+                      {m.plan?.targetCells ?? '—'}
+                      {m.plan?.targetClusters ? <span className="xs mute"> / {m.plan.targetClusters} 簇</span> : null}
+                    </td>
+                    <td className="xs">{m.spray?.agent}</td>
+                    <td className="num">{m.spray?.speed} m/s</td>
+                    <td className="num">{m.spray?.flow} L/min</td>
+                    <td className="num">{m.plan?.estVolumeL} L</td>
+                    <td className="num dim">{m.plan?.uniformZoneL ?? '—'} L</td>
+                    <td className="num"><span className="green">
+                      −{m.plan?.savedVsZoneL ?? '—'} L
+                      {m.plan?.savedRatioVsZone != null ? `（${m.plan.savedRatioVsZone}%）` : ''}
+                    </span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            </div>
+            <div className="xs mute" style={{ marginTop: 9 }}>
+              「分区整喷」= 同一管理分区若按 12 L/ha 均匀喷洒所需的药量；
+              「节药」= 只对确诊病灶格点喷、相对分区整喷省下的药量。两者同口径，可直接相加。
+            </div>
+          </>
         )}
       </div>
     </>

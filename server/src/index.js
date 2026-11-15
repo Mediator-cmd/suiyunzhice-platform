@@ -59,6 +59,11 @@ const hub = new RealtimeHub({
   },
   onDetection: (d) => {
     broadcast('detection', d);
+    // 地面机器人回传近距复核证据 → 闭合此前派单的联动事件
+    if (d.kind === 'robot') {
+      const closedEv = linkage.completeCycle(d);
+      if (closedEv) broadcast('linkage', closedEv);
+    }
     const verdict = linkage.evaluateDetection(d);
     if (verdict.needRecheck) {
       const plan = getPlan().best;
@@ -288,6 +293,11 @@ if (SIM) {
       try {
         store.insertDetection(d);
         broadcast('detection', d);
+        // 地面机器人回传近距复核证据 → 闭合此前派单的联动事件
+        if (d.kind === 'robot') {
+          const closedEv = linkage.completeCycle(d);
+          if (closedEv) broadcast('linkage', closedEv);
+        }
         const verdict = linkage.evaluateDetection(d);
         if (verdict.needRecheck) {
           const plan = getPlan().best;

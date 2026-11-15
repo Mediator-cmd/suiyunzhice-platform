@@ -1,6 +1,7 @@
 import React from 'react';
 import { CHART, MAP } from '../theme.js';
 import { FieldMap, DISEASE_COLOR } from '../components/FieldMap.jsx';
+import GridDetail from '../components/GridDetail.jsx';
 import {
   IconScan, IconChart, IconDispatch, IconRoute,
 } from '../components/Icons.jsx';
@@ -13,6 +14,8 @@ const CAPABILITIES = [
 ];
 
 export default function Overview({ meta, devices, telemetry, detections, events, overview, briefing, missions, mode, onNav }) {
+  // 点击地图上的病害网格 → 展开该网格的完整档案（识别—地块—任务 可追溯）
+  const [selGrid, setSelGrid] = React.useState(null);
   if (!meta) return <div className="empty">正在加载平台数据…</div>;
   const ov = overview || {};
   const det = ov.detection || {};
@@ -25,7 +28,7 @@ export default function Overview({ meta, devices, telemetry, detections, events,
     { label: '累计识别', value: det.total || 0, sub: `已确认 ${det.confirmed || 0} 处`, cls: '' },
     { label: '平均置信度', value: `${((det.avgConfidence || 0) * 100).toFixed(1)}%`, sub: 'SAN-GAT-RL 多模态模型', cls: 'green' },
     { label: '联动闭环时延', value: `${((link.avgLatencyMs || 0) / 1000).toFixed(1)}s`, sub: `P95 ${((link.p95LatencyMs || 0) / 1000).toFixed(1)}s`, cls: 'amber' },
-    { label: '药液节约率', value: eff.savedRatio == null ? '待作业' : `${eff.savedRatio}%`, sub: eff.savedRatio == null ? '尚无喷洒任务' : `对比整田均匀喷施少用 ${eff.savedVolumeL || 0} L`, cls: 'green' },
+    { label: '药液节约率', value: eff.savedRatio == null ? '待作业' : `${eff.savedRatio}%`, sub: eff.savedRatio == null ? '尚无喷洒任务' : `靶向点喷对比整田均匀喷施少用 ${eff.savedVolumeL || 0} L`, cls: 'green' },
   ];
 
   const recentEvents = (events || []).slice(0, 5);
@@ -65,8 +68,13 @@ export default function Overview({ meta, devices, telemetry, detections, events,
               </span>
             </h3>
           </div>
-          <FieldMap field={meta.field} devices={devices} detections={detections} events={events} missions={missions} height={504} />
+          <FieldMap field={meta.field} devices={devices} detections={detections} events={events} missions={missions}
+            height={504} onGridClick={setSelGrid} selectedGrid={selGrid} />
           <div style={{ padding: '8px 24px 16px' }}>
+            {selGrid && (
+              <GridDetail grid={selGrid} detections={detections} missions={missions} events={events}
+                onClose={() => setSelGrid(null)} />
+            )}
             <div className="legend">
               <span><i style={{ background: CHART.blue }} />植保无人机</span>
               <span><i style={{ background: CHART.robot }} />地面监测机器人</span>
@@ -121,8 +129,12 @@ export default function Overview({ meta, devices, telemetry, detections, events,
                       <span className="tag">喷幅 {m.spray?.swath} m</span>
                     </div>
                     <div className="xs dim" style={{ marginTop: 8 }}>
-                      比例锁 流量÷速度 = {m.spray?.flowPerSpeed}，药耗 {m.plan?.estVolumeL} L，
-                      较整田均匀喷施（{f.areaHa?.toFixed(1)} ha × 12 L/ha）省 {m.plan?.savedVsUniformL} L
+                      靶向 {m.plan?.targetCells ?? '—'} 格 / {m.plan?.targetClusters ?? '—'} 簇，
+                      比例锁 流量÷速度 = {m.spray?.flowPerSpeed}，药耗 {m.plan?.estVolumeL} L
+                    </div>
+                    <div className="xs dim" style={{ marginTop: 4 }}>
+                      分区整喷 {m.plan?.uniformZoneL ?? '—'} L → 本单省 {m.plan?.savedVsZoneL ?? '—'} L
+                      {m.plan?.savedRatioVsZone != null ? `（${m.plan.savedRatioVsZone}%）` : ''}
                     </div>
                   </div>
                 ))}

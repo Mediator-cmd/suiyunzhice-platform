@@ -104,6 +104,11 @@ class LocalEngine {
       onDetection: (d) => {
         this.store.insertDetection(d);
         this.emit('detection', d);
+        // 地面机器人回传近距复核证据 → 闭合此前派单的联动事件
+        if (d.kind === 'robot') {
+          const closedEv = this.linkage.completeCycle(d);
+          if (closedEv) this.emit('linkage', closedEv);
+        }
         // 与服务端一致的联动判据：需近地复核则派单并记录闭环事件
         const verdict = this.linkage.evaluateDetection(d);
         if (verdict.needRecheck) {

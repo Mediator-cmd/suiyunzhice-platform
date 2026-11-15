@@ -85,6 +85,9 @@ export function FieldMap({
     return out;
   }, [detections, field]);
 
+  // 选中网格（对象形式 {row,col}）对应的 key
+  const selKey = selectedGrid ? `${selectedGrid.row}_${selectedGrid.col}` : null;
+
   /* ---------- 5 m 作业网格线 ---------- */
   const gridLines = useMemo(() => {
     const lines = [];
@@ -256,12 +259,14 @@ export function FieldMap({
         ))}
 
         {/* 病害网格 */}
+
+        {/* 选中态：selKey 由外部传入的 {row,col} 推导 */}
         {gridPolys.map(g => (
           <Polygon key={g.key} positions={g.poly}
             eventHandlers={onGridClick ? { click: () => onGridClick({ row: g.key.split('_')[0] * 1, col: g.key.split('_')[1] * 1 }) } : {}}
             pathOptions={{
-              color: g.key === selectedGrid ? '#16a34a' : g.color,
-              weight: g.key === selectedGrid ? 2.5 : 1,
+              color: selKey === g.key ? '#16a34a' : g.color,
+              weight: selKey === g.key ? 2.5 : 1,
               fillColor: g.color,
               fillOpacity: 0.18 + g.maxConf * 0.42,
             }}>

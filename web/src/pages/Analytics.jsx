@@ -95,6 +95,7 @@ function SpatialView({ data, meta, detections }) {
       </div>
       <div className="card">
         <h3>高密度网格 Top 12</h3>
+        <div className="tbl-wrap">
         <table className="tbl">
           <thead><tr><th>网格</th><th className="right">检出</th><th className="right">置信度</th><th>主病种</th><th>状态</th></tr></thead>
           <tbody>
@@ -110,6 +111,7 @@ function SpatialView({ data, meta, detections }) {
             {top.length === 0 && <tr><td colSpan={5}><div className="empty">暂无空间统计</div></td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
@@ -167,6 +169,7 @@ function TemporalView({ data }) {
       </div>
       <div className="card">
         <h3>逐日明细</h3>
+        <div className="tbl-wrap">
         <table className="tbl">
           <thead><tr><th>日期</th><th className="right">检出</th><th className="right">均信</th><th className="right">施药</th></tr></thead>
           <tbody>
@@ -180,6 +183,7 @@ function TemporalView({ data }) {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
@@ -207,6 +211,7 @@ function DiseaseView({ data }) {
       </div>
       <div className="card">
         <h3>分病种防治建议 <span className="tag">可执行结论</span></h3>
+        <div className="tbl-wrap">
         <table className="tbl">
           <thead><tr><th>病种</th><th>拉丁名</th><th>发病部位</th><th className="right">检出</th><th>建议</th></tr></thead>
           <tbody>
@@ -221,6 +226,7 @@ function DiseaseView({ data }) {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

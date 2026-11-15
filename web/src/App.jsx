@@ -1,14 +1,24 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, lazy, Suspense } from 'react';
 import { api, subscribe, MODE } from './api.js';
 import Overview from './pages/Overview.jsx';
-import Realtime from './pages/Realtime.jsx';
-import Linkage from './pages/Linkage.jsx';
-import Analytics from './pages/Analytics.jsx';
-import Agro from './pages/Agro.jsx';
-import Planner from './pages/Planner.jsx';
-import Planning from './pages/Planning.jsx';
-import Farm from './pages/Farm.jsx';
-import Architecture from './pages/Architecture.jsx';
+import { ErrorBoundary } from './components/ErrorBoundary.jsx';
+
+/*
+ * 按板块分包加载。
+ *
+ * 之前所有页面打成一个 bundle（919 KB / gzip 268 KB），首屏要等
+ * Recharts + Leaflet 全部下载完才出画面。改成按需加载后：
+ *   总览（首屏）只需要 Overview，不含图表库与地图库；
+ *   带图表的三个页面才拉 Recharts，带地图的才拉 Leaflet。
+ */
+const Realtime    = lazy(() => import('./pages/Realtime.jsx'));
+const Linkage     = lazy(() => import('./pages/Linkage.jsx'));
+const Analytics   = lazy(() => import('./pages/Analytics.jsx'));
+const Agro        = lazy(() => import('./pages/Agro.jsx'));
+const Planner     = lazy(() => import('./pages/Planner.jsx'));
+const Planning    = lazy(() => import('./pages/Planning.jsx'));
+const Farm        = lazy(() => import('./pages/Farm.jsx'));
+const Architecture = lazy(() => import('./pages/Architecture.jsx'));
 
 /**
  * 板块设置（信息架构）
@@ -34,7 +44,11 @@ const NAV = [
 ];
 
 export default function App() {
-  const [page, setPage] = useState('overview');
+  // 用 location.hash 记录当前板块：可深链接、可后退，刷新不丢位置
+  const [page, setPage] = useState(() => {
+    const h = (window.location.hash || '').replace(/^#\/?/, '');
+    return NAV.some(n => n.id === h) ? h : 'overview';
+  });
   const [mode, setMode] = useState(MODE.MOCK);
   const [meta, setMeta] = useState(null);
   const [devices, setDevices] = useState([]);
@@ -48,6 +62,22 @@ export default function App() {
   const [dimCache, setDimCache] = useState({});
   const [lastMsg, setLastMsg] = useState(null);
   const [bootError, setBootError] = useState(null);
+
+  // ---- 板块 ↔ URL hash 双向同步 ----
+  useEffect(() => {
+    const onHash = () => {
+      const h = (window.location.hash || '').replace(/^#\/?/, '');
+      if (NAV.some(n => n.id === h)) setPage(h);
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  useEffect(() => {
+    if (window.location.hash.replace(/^#\/?/, '') !== page) {
+      window.location.hash = `/${page}`;
+    }
+  }, [page]);
 
   // ---- 首次加载静态数据 ----
   useEffect(() => {
@@ -190,7 +220,11 @@ export default function App() {
             </div>
           </div>
         )}
-        <Page {...shared} onNav={setPage} />
+        <ErrorBoundary label={NAV.find(n => n.id === page)?.label}>
+          <Suspense fallback={<div className="card"><div className="empty">正在加载「{NAV.find(n => n.id === page)?.label}」…</div></div>}>
+            <Page {...shared} onNav={setPage} />
+          </Suspense>
+        </ErrorBoundary>
       </main>
     </div>
   );

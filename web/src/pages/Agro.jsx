@@ -134,6 +134,7 @@ export default function Agro({ detections, missions, meta }) {
           </div>
 
           <div className="xs" style={{ marginBottom: 8 }}><b>三日预报</b>{forecast[0]?.simulated ? <span className="xs mute">（模拟）</span> : null}</div>
+          <div className="tbl-wrap">
           <table className="tbl">
             <thead>
               <tr><th>日期</th><th>天气</th><th className="right">温度</th><th className="right">风速</th><th>施药</th></tr>
@@ -154,6 +155,7 @@ export default function Agro({ detections, missions, meta }) {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
