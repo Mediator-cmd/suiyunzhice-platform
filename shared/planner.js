@@ -563,6 +563,7 @@ export function compareWithManual(best, manual) {
   const s = (x) => ({
     minutes: x.minutes, volumeL: x.volumeL, lengthM: x.lengthM,
     overlap: x.overlap, turningShare: x.turningShare,
+    batteryPct: x.batteryPct,
   });
   const b = s(best.score.detail), m = s(manual);
   const gain = (k) => (m[k] > 0 && Number.isFinite(m[k]) ? round((1 - b[k] / m[k]) * 100, 1) : 0);
