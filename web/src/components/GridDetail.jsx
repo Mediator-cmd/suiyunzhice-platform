@@ -14,6 +14,14 @@ import { DISEASE_COLOR } from './FieldMap.jsx';
 
 const DISEASE_NAME = Object.fromEntries(DISEASES.map(d => [d.code, d.name]));
 
+function photoLink(value) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  try {
+    const url = new URL(value, document.baseURI);
+    return ['https:', 'http:'].includes(url.protocol) ? url.href : null;
+  } catch { return null; }
+}
+
 export default function GridDetail({ grid, detections, missions, events, onClose }) {
   const inGrid = useMemo(() => {
     if (!grid) return [];
@@ -35,8 +43,6 @@ export default function GridDetail({ grid, detections, missions, events, onClose
     });
   }, [grid, missions]);
 
-  if (!grid) return null;
-
   const byDisease = useMemo(() => {
     const m = new Map();
     for (const d of inGrid) {
@@ -49,6 +55,9 @@ export default function GridDetail({ grid, detections, missions, events, onClose
     }
     return [...m.entries()].sort((a, b) => b[1].count - a[1].count);
   }, [inGrid]);
+
+  if (!grid) return null;
+  const photos = inGrid.filter(item => photoLink(item.imageUrl));
 
   const avgConf = inGrid.length
     ? inGrid.reduce((a, d) => a + (d.confidence || 0), 0) / inGrid.length : 0;
@@ -137,6 +146,9 @@ export default function GridDetail({ grid, detections, missions, events, onClose
             )}
           </div>
 
+          {photos.length > 0 && <details><summary>识别原图 · {photos.length} 张</summary>
+            {photos.map(item => <div key={item.detId}><a href={photoLink(item.imageUrl)} target="_blank" rel="noreferrer">{DISEASE_NAME[item.disease] || item.disease} · {new Date(item.ts).toLocaleTimeString('zh-CN')} · 查看原图</a></div>)}
+          </details>}
           <div className="xs mute" style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
             最近一次识别：{new Date(Math.max(...inGrid.map(d => d.ts || 0))).toLocaleString('zh-CN')}
             {' · '}模型 {inGrid[0]?.model || 'SAN-GAT-RL'}

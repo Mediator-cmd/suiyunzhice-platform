@@ -78,6 +78,7 @@ export class MemoryStore {
       part: d.part, disease: d.disease, confidence: d.confidence,
       bbox: d.bbox || {}, geo: d.geo || {}, grid: d.grid || {},
       model: d.model ?? 'SAN-GAT-RL',
+      imageUrl: d.imageUrl ?? null,
     };
     if (i >= 0) this.detections[i] = rec; else this.detections.push(rec);
   }

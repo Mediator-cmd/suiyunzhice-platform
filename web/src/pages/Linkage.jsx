@@ -1,4 +1,5 @@
 import { CHART } from '../theme.js';
+import { CaseReplay } from '../components/Casebook.jsx';
 import React, { useMemo } from 'react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid,
@@ -16,7 +17,7 @@ const CHAIN_STEPS = [
   { key: 'uav_spray',    icon: IconSpray,   color: 'var(--uav)',   label: '靶向喷洒', desc: '生成施药任务，按速度-喷洒比例执行' },
 ];
 
-export default function Linkage({ meta, devices, detections, events, overview }) {
+export default function Linkage({ meta, devices, detections, events, overview, caseId, selectCase, onNav }) {
   const stats = useMemo(() => {
     const evs = events || [];
     if (!evs.length) return null;
@@ -65,6 +66,7 @@ export default function Linkage({ meta, devices, detections, events, overview })
       </div>
 
       {/* 联动链路示意 */}
+      <CaseReplay caseId={caseId} selectCase={selectCase} onLibrary={() => onNav('agro')} />
       <div className="card" style={{ marginBottom: 12 }}>
         <h3>联动闭环 <span className="tag">每次闭环全链时延可追溯</span></h3>
         <div className="chain-flow">

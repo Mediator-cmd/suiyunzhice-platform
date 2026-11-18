@@ -50,6 +50,13 @@ export default function App() {
     return NAV.some(n => n.id === h) ? h : 'overview';
   });
   const [mode, setMode] = useState(MODE.MOCK);
+  const [caseId, selectCase] = useState('powdery-07');
+  useEffect(() => {
+    document.querySelector('main')?.scrollTo(0, 0);
+    if (window.matchMedia('(max-width: 700px)').matches) {
+      document.querySelector('.nav .active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  }, [page]);
   const [meta, setMeta] = useState(null);
   const [devices, setDevices] = useState([]);
   const [telemetry, setTelemetry] = useState([]);
@@ -222,7 +229,7 @@ export default function App() {
         )}
         <ErrorBoundary label={NAV.find(n => n.id === page)?.label}>
           <Suspense fallback={<div className="card"><div className="empty">正在加载「{NAV.find(n => n.id === page)?.label}」…</div></div>}>
-            <Page {...shared} onNav={setPage} />
+            <Page {...shared} onNav={setPage} caseId={caseId} selectCase={selectCase} />
           </Suspense>
         </ErrorBoundary>
       </main>

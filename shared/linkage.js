@@ -75,7 +75,7 @@ export class LinkageEngine {
     let needRecheck = false;
 
     if (det.confidence < confidenceThreshold) {
-      reasons.push(`置信度 ${(det.confidence * 100).toFixed(0)}% 低于阈值 ${(confidenceThreshold * 100).toFixed(0)}%`);
+      reasons.push(`置信度 ${Number((det.confidence * 100).toFixed(1))}% 低于阈值 ${(confidenceThreshold * 100).toFixed(0)}%`);
       needRecheck = true;
     }
     if (['underside', 'stem', 'soil'].includes(det.part)) {

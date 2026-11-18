@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { DISEASE_COLOR } from '../components/FieldMap.jsx';
 import { DISEASE_PHOTOS } from '../assets.js';
+import { SampleLibrary } from '../components/Casebook.jsx';
 import {
   SPRAY_STRATEGIES, AGRO_CALENDAR, SPRAY_WINDOW_RULES,
   currentWeather, weatherForecast, windScale,
@@ -23,7 +24,7 @@ import {
  * 纯静态演示时也在浏览器里算出同一套结果。
  */
 
-export default function Agro({ detections, missions, meta }) {
+export default function Agro({ detections, missions, meta, caseId, selectCase, onNav }) {
   const w = useMemo(() => currentWeather(), []);
   const forecast = useMemo(() => weatherForecast(), []);
   const ws = windScale(w.wind);
@@ -48,12 +49,12 @@ export default function Agro({ detections, missions, meta }) {
       <div className="page-head">
         <h2>农情与施药策略</h2>
         <p>
-          回答「现在能不能打药、该打什么药、打多少、多久能打第二次」四个问题。
-          气象与策略是原平台的有效部分，这里保留并改为可量化、可按实测病区动态选用。
+          对照田间症状，结合天气窗口选择施药策略。
         </p>
       </div>
 
       {/* 气象实况 + 施药窗口 */}
+      <SampleLibrary caseId={caseId} selectCase={selectCase} onReplay={() => onNav('linkage')} />
       <div className="grid g-2-1" style={{ marginBottom: 12 }}>
         <div className="card">
           <h3>

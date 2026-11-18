@@ -65,6 +65,9 @@ export class Store {
       );
     `);
     this.migrateMissions();
+    if (!this.db.prepare('PRAGMA table_info(detections)').all().some(column => column.name === 'image_url')) {
+      this.db.exec('ALTER TABLE detections ADD COLUMN image_url TEXT');
+    }
   }
 
   /**
@@ -177,12 +180,12 @@ export class Store {
   // ---- 检测 ----
   insertDetection(d) {
     this.db.prepare(`INSERT OR REPLACE INTO detections
-      (det_id,ts,device_id,kind,part,disease,confidence,bx,by,bw,bh,gx,gy,grid_row,grid_col,model)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      (det_id,ts,device_id,kind,part,disease,confidence,bx,by,bw,bh,gx,gy,grid_row,grid_col,model,image_url)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(nz(d.detId), nz(d.ts), nz(d.deviceId), nz(d.kind), nz(d.part), nz(d.disease), nz(d.confidence),
         nz(d.bbox?.x), nz(d.bbox?.y), nz(d.bbox?.w), nz(d.bbox?.h),
         nz(d.geo?.x), nz(d.geo?.y), nz(d.grid?.row), nz(d.grid?.col),
-        nz(d.model ?? 'SAN-GAT-RL'));
+        nz(d.model ?? 'SAN-GAT-RL'), nz(d.imageUrl));
   }
   listDetections(limit = 500) {
     return this.db.prepare(`SELECT * FROM detections ORDER BY ts DESC LIMIT ?`).all(limit).map(r => ({
@@ -190,7 +193,7 @@ export class Store {
       disease: r.disease, confidence: r.confidence,
       bbox: { x: r.bx, y: r.by, w: r.bw, h: r.bh },
       geo: { x: r.gx, y: r.gy }, grid: { row: r.grid_row, col: r.grid_col },
-      model: r.model,
+      model: r.model, imageUrl: r.image_url,
     }));
   }
 
