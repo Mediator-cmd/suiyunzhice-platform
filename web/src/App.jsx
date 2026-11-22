@@ -1,30 +1,33 @@
-import React, { useEffect, useState, useMemo, useCallback, lazy, Suspense } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { api, subscribe, MODE } from './api.js';
 import Overview from './pages/Overview.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { BRAND, BRAND_FULL, OFFICIAL_URL, OFFICIAL_URL_TEXT, TEAM, VERSION } from './platform-info.js';
 
 /*
- * 按板块分包加载。
+ * 页面加载策略：从分包改为整包同步导入。
  *
- * 之前所有页面打成一个 bundle（919 KB / gzip 268 KB），首屏要等
- * Recharts + Leaflet 全部下载完才出画面。改成按需加载后：
- *   总览（首屏）只需要 Overview，不含图表库与地图库；
- *   带图表的三个页面才拉 Recharts，带地图的才拉 Leaflet。
+ * 原本每个页面是一个 lazy chunk，实测公网（GitHub Pages）首次切页要等
+ * 15.9 秒才渲染出来 —— 评委现场点一下看到十几秒空白，这是致命的。
+ * 分包省下来的那点首屏时间，代价是每一次切页都要付一次网络往返。
+ *
+ * 现在改为同步导入：全部页面打进主 chunk，切页零延迟。
+ * 实测总包 433 KB / gzip 140 KB，一次下载完全可接受；
+ * 且 Recharts 与 Leaflet 本来就被多数页面共用，分包并没有省下多少。
  */
-const Realtime    = lazy(() => import('./pages/Realtime.jsx'));
-const Linkage     = lazy(() => import('./pages/Linkage.jsx'));
-const Analytics   = lazy(() => import('./pages/Analytics.jsx'));
-const Agro        = lazy(() => import('./pages/Agro.jsx'));
-const Planner     = lazy(() => import('./pages/Planner.jsx'));
-const Planning    = lazy(() => import('./pages/Planning.jsx'));
-const Farm        = lazy(() => import('./pages/Farm.jsx'));
-const Architecture = lazy(() => import('./pages/Architecture.jsx'));
-const Tenancy     = lazy(() => import('./pages/Tenancy.jsx'));
-const Access      = lazy(() => import('./pages/Access.jsx'));
-const Metering    = lazy(() => import('./pages/Metering.jsx'));
-const Developers  = lazy(() => import('./pages/Developers.jsx'));
-const Mobile      = lazy(() => import('./pages/Mobile.jsx'));
+import Realtime     from './pages/Realtime.jsx';
+import Linkage      from './pages/Linkage.jsx';
+import Analytics    from './pages/Analytics.jsx';
+import Agro         from './pages/Agro.jsx';
+import Planner      from './pages/Planner.jsx';
+import Planning     from './pages/Planning.jsx';
+import Farm         from './pages/Farm.jsx';
+import Architecture from './pages/Architecture.jsx';
+import Tenancy      from './pages/Tenancy.jsx';
+import Access       from './pages/Access.jsx';
+import Metering     from './pages/Metering.jsx';
+import Developers   from './pages/Developers.jsx';
+import Mobile       from './pages/Mobile.jsx';
 
 /**
  * 板块设置（信息架构）
@@ -272,9 +275,9 @@ export default function App() {
           </div>
         )}
         <ErrorBoundary label={NAV.find(n => n.id === page)?.label}>
-          <Suspense fallback={<div className="card"><div className="empty">正在加载「{NAV.find(n => n.id === page)?.label}」…</div></div>}>
+          <div>
             <Page {...shared} onNav={setPage} caseId={caseId} selectCase={selectCase} />
-          </Suspense>
+          </div>
         </ErrorBoundary>
       </main>
     </div>
