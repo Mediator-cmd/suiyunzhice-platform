@@ -62,7 +62,15 @@ export function pickSprayZones(dets, missions, field) {
       byZone.set(key, { zoneId: key, cells: [], count: 0, diseases: {}, confSum: 0 });
     }
     const z = byZone.get(key);
-    z.cells.push({ row: d.grid.row, col: d.grid.col });
+    // 网格去重：同一网格可能有多条识别结果（多次飞行/多次复核），
+    // 但作业单的靶向网格是「格」不是「条」—— 不去重会让喷洒面积成倍虚高，
+    // 覆盖率与节药率随之失真。
+    const cellKey = `${d.grid.row}_${d.grid.col}`;
+    if (!z.cellKeys) z.cellKeys = new Set();
+    if (!z.cellKeys.has(cellKey)) {
+      z.cellKeys.add(cellKey);
+      z.cells.push({ row: d.grid.row, col: d.grid.col });
+    }
     z.count += 1;
     z.confSum += d.confidence;
     z.diseases[d.disease] = (z.diseases[d.disease] || 0) + 1;
@@ -124,4 +132,64 @@ export function buildSprayMissions({ field, dets, missions, plan = null }) {
  */
 export function savingSummary(missions, field) {
   return spraySavingRatio(missions, field, TARGET_SPRAY.targetDoseLha);
+}
+
+/**
+ * 构造复核作业单 —— 服务端与浏览器端共用
+ *
+ * 为什么单独抽出来：复核单是「空中发现 → 地面复核」这条链的载体，
+ * 掌上端要靠它拿到待作业点位清单（去哪个网格、拍几张、什么参数）。
+ * 早前服务端与浏览器端各写一份、且都忘了带 cells，
+ * 结果掌上端拿到的作业单是空的 —— 这类"两端各写一份"的坑正是
+ * 共享内核要消除的。
+ *
+ * @param {object} p { detection, field, missionId, cells, agent }
+ * @returns {object} 复核作业单
+ */
+export function buildRecheckMission({ detection, field, missionId, cells = null, agent = null }) {
+  const g = detection?.grid || {};
+  // 点位清单：优先用传入的；否则按该网格周围的相邻格展开
+  // （空中看到的是冠层，地面复核通常要看相邻 3×3 范围的叶下与茎基）
+  let cellList = cells;
+  if (!cellList || !cellList.length) {
+    cellList = [];
+    if (g.row != null && g.col != null) {
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          const r = g.row + dr, c = g.col + dc;
+          if (r < 0 || c < 0) continue;
+          if (field?.gridRows && r >= field.gridRows) continue;
+          if (field?.gridCols && c >= field.gridCols) continue;
+          cellList.push({ row: r, col: c });
+        }
+      }
+    }
+  }
+  const zoneId = field?.zoneOfGrid && g.row != null ? field.zoneOfGrid(g.row, g.col) : null;
+
+  return {
+    missionId: missionId || `RC-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    createdAt: Date.now(),
+    type: 'recheck',
+    tenantId: null,
+    target: {
+      grid: { row: g.row ?? null, col: g.col ?? null },
+      cells: cellList,
+      bbox: null,
+    },
+    zoneId,
+    zoneName: zoneId ? `${zoneId} 区` : null,
+    disease: detection?.disease ?? null,
+    spray: {},
+    plan: {
+      algo: 'near-field-recheck',
+      targetCells: cellList.length,
+      // 近距复核按每点位 45 秒估算
+      estMinutes: +(cellList.length * 0.75).toFixed(1),
+    },
+    status: 'pending',
+    // 复核需要的拍摄部位：空中看不到的部位
+    recheckParts: ['underside', 'stem', 'soil'],
+    agent: agent || null,
+  };
 }

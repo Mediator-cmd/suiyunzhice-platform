@@ -9,6 +9,7 @@
  */
 
 import { DISEASES, ANALYTICS_DIMENSIONS } from './schema.js';
+import { autoPlan } from './planner.js';
 
 export class Analytics {
   constructor(store, field = null) {
@@ -24,20 +25,46 @@ export class Analytics {
     return 0;
   }
 
+  /**
+   * 全田覆盖药耗（L）：整机喷幅做一次全田作业的实际药耗。
+   * 与 planner.autoPlan('full') 同源，保证「全田 vs 靶向」两侧口径一致。
+   */
+  fullCoverageVolumeL() {
+    if (this._fullVolL !== undefined) return this._fullVolL;
+    try {
+      const field = this.field;
+      if (!field || typeof field.zones !== 'function') return null;
+      const p = autoPlan(field, { mode: 'full' });
+      this._fullVolL = p?.best?.ratio?.totalVolumeL ?? null;
+      return this._fullVolL;
+    } catch {
+      return null;
+    }
+  }
+
   /** 总览 KPI */
   overview() {
     const dets = this.store.listDetections(5000);
-    const missions = this.store.listMissions(500);
+    // 施药任务按类型取，避免被数量远多的复核任务挤出「最新 N 条」窗口
+    const missions = this.store.listMissionsByType
+      ? this.store.listMissionsByType('spray', 500)
+      : this.store.listMissions(500);
     const links = this.store.listLinkEvents(500);
     const devices = this.store.listDevices();
 
     const confirmed = dets.filter(d => d.confidence >= 0.75);
-    const sprayed = missions.filter(m => m.type === 'spray');
+    // 施药任务按类型取：复核任务量远大于施药任务，
+    // 用「最新 N 条」窗口会把施药任务挤掉，节药率随之变成「待作业」。
+    const sprayed = this.store.listMissionsByType
+      ? this.store.listMissionsByType('spray', 500)
+      : this.store.listMissions(500).filter(m => m.type === 'spray');
 
     // 植保效率提升（农户视角）
-    // 对照基准：若对同一块地做整田均匀喷施
+    // 对照基准：若对同一块地做整田均匀喷施。
+    // 分母必须与 planner 的「全田作业单」自洽（整机喷幅下 25.2 L），
+    // 不能用「面积×剂量」的理想值 24 L —— 两个分母会算出两个节约率。
     const fieldAreaHa = this.fieldAreaHa();              // 示范田面积 ha
-    const traditionalVolume = fieldAreaHa * 12;          // L（12 L/ha 整田喷施）
+    const traditionalVolume = this.fullCoverageVolumeL() ?? (fieldAreaHa * 12);
     const preciseVolume = sprayed.reduce((a, m) => a + (m.plan?.estVolumeL || 0), 0);
     // 只有产生喷洒任务时才计算节约率，避免除零与虚假 100%
     const savedRatio = sprayed.length > 0 && traditionalVolume > 0
@@ -309,9 +336,12 @@ export class Analytics {
   /** 农户信息面板：把统计翻译成"今天该做什么" */
   farmerBriefing() {
     const ov = this.overview();
-    const spatial = this.spatial(this.store.listDetections(5000), this.store.listMissions(500));
-    const disease = this.disease(this.store.listDetections(5000), this.store.listMissions(500));
-    const env = this.environment(this.store.listDetections(5000), this.store.listMissions(500));
+    const sprayMissions = this.store.listMissionsByType
+      ? this.store.listMissionsByType('spray', 500)
+      : this.store.listMissions(500);
+    const spatial = this.spatial(this.store.listDetections(5000), sprayMissions);
+    const disease = this.disease(this.store.listDetections(5000), sprayMissions);
+    const env = this.environment(this.store.listDetections(5000), sprayMissions);
 
     const hot = spatial.rows.filter(r => r.density >= 2).slice(0, 5);
     const topDisease = disease.rows.filter(r => r.count > 0).slice(0, 3);

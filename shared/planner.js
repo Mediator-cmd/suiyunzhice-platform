@@ -782,7 +782,12 @@ export function buildSprayMission({
 export function spraySavingRatio(missions, field, targetDoseLha = 12) {
   const sprays = missions.filter(m => m.type === 'spray');
   if (!sprays.length) return null;
-  const uniformL = field.totalAreaHa() * targetDoseLha;
+  // 全田基准 = 用整机喷幅做一次全田覆盖的实际药耗（不是「面积×剂量」的理想值）。
+  // 两者相差不大，但必须与 autoPlan('full') 的作业单自洽：
+  // 申报书的「25.2 L → 0.57 L，节约 97.7%」用的就是这个口径。
+  const fullPlan = autoPlan(field, { mode: 'full' });
+  const uniformL = fullPlan?.best?.ratio?.totalVolumeL
+    ?? (field.totalAreaHa() * targetDoseLha);
   if (uniformL <= 0) return null;
   const preciseL = sprays.reduce((a, m) => a + (m.plan?.estVolumeL || 0), 0);
   if (preciseL <= 0) return null;

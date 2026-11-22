@@ -7,7 +7,7 @@ import { chromium } from 'playwright-core';
  * 这是「提交给评委/老师看的那条链接」的直接验证。
  */
 
-const EXE = 'C:/Users/ASUS/AppData/Local/ms-playwright/chromium-1208/chrome-win64/chrome.exe';
+const EXE = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const OUT = 'C:/Users/ASUS/_shots';
 const URL = process.argv[2] || 'https://mediator-cmd.github.io/suiyunzhice-platform/';
 

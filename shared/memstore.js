@@ -20,6 +20,12 @@ export class MemoryStore {
     this.missions = [];
     this.linkEvents = [];
     this.sprays = [];
+    // 平台底座
+    this.tenants = new Map();
+    this.members = new Map();
+    this.deviceAccess = new Map();
+    this.commands = new Map();
+    this.usage = [];
   }
 
   // ---- 地块 ----
@@ -109,6 +115,11 @@ export class MemoryStore {
   listMissions(limit = 200) {
     return this.missions.slice().sort((a, b) => b.createdAt - a.createdAt).slice(0, limit);
   }
+  /** 按类型取任务：复核任务量远大于施药任务，按类型取可避免统计口径被挤掉 */
+  listMissionsByType(type, limit = 200) {
+    return this.missions.filter(m => m.type === type)
+      .sort((a, b) => b.createdAt - a.createdAt).slice(0, limit);
+  }
 
   // ---- 联动事件 ----
   insertLinkEvent(e) {
@@ -135,5 +146,81 @@ export class MemoryStore {
       missions: this.missions.length, link_events: this.linkEvents.length,
       sprays: this.sprays.length,
     }[table] || 0;
+  }
+
+  /* ================================================================
+   * 平台底座：租户 / 成员 / 设备接入 / 指令 / 计量
+   * 与服务端 SQLite Store 接口保持一致。
+   * ================================================================ */
+
+  // ---- 租户 ----
+  upsertTenant(t) {
+    const id = t.id || t.tenantId;
+    this.tenants.set(id, {
+      id, name: t.name, type: t.type || 'farm',
+      contact: t.contact ?? null, createdAt: t.createdAt ?? Date.now(),
+    });
+  }
+  listTenants() { return [...this.tenants.values()].sort((a, b) => a.createdAt - b.createdAt); }
+  getTenant(id) { return this.tenants.get(id) || null; }
+
+  // ---- 成员 ----
+  upsertMember(m) {
+    this.members.set(m.userId, {
+      userId: m.userId, tenantId: m.tenantId, name: m.name, role: m.role,
+      fieldIds: m.fieldIds || [], createdAt: m.createdAt ?? Date.now(),
+    });
+  }
+  listMembers(tenantId = null) {
+    const all = [...this.members.values()].sort((a, b) => a.createdAt - b.createdAt);
+    return tenantId ? all.filter(m => m.tenantId === tenantId) : all;
+  }
+  getMember(userId) { return this.members.get(userId) || null; }
+
+  // ---- 设备接入 ----
+  upsertDeviceAccess(d) {
+    this.deviceAccess.set(d.deviceId, {
+      deviceId: d.deviceId, tenantId: d.tenantId, ownerUserId: d.ownerUserId ?? null,
+      kind: d.kind, name: d.name, model: d.model ?? '', accessState: d.accessState,
+      salt: d.salt, registeredAt: d.registeredAt ?? Date.now(),
+      lastSeen: d.lastSeen ?? Date.now(), online: !!d.online,
+    });
+  }
+  listDeviceAccess() {
+    return [...this.deviceAccess.values()].sort((a, b) => a.registeredAt - b.registeredAt);
+  }
+  getDeviceAccess(deviceId) { return this.deviceAccess.get(deviceId) || null; }
+  setDeviceAccessState(deviceId, state) {
+    const d = this.deviceAccess.get(deviceId);
+    if (d) d.accessState = state;
+  }
+
+  // ---- 指令 ----
+  insertCommand(c) {
+    this.commands.set(c.commandId, {
+      commandId: c.commandId, deviceId: c.deviceId, tenantId: c.tenantId ?? null,
+      type: c.type, missionId: c.missionId ?? null,
+      payload: c.payload || {}, state: c.state,
+      issuedAt: c.issuedAt ?? Date.now(), ackedAt: c.ackedAt ?? null, doneAt: c.doneAt ?? null,
+    });
+  }
+  listCommands(deviceId = null, limit = 200) {
+    let all = [...this.commands.values()].sort((a, b) => b.issuedAt - a.issuedAt);
+    if (deviceId) all = all.filter(c => c.deviceId === deviceId);
+    return all.slice(0, limit);
+  }
+
+  // ---- 计量 ----
+  insertUsage(u) {
+    this.usage.push({
+      ts: u.ts ?? Date.now(), tenantId: u.tenantId, missionId: u.missionId, type: u.type,
+      areaMu: u.areaMu ?? null, volumeL: u.volumeL ?? null, minutes: u.minutes ?? null,
+      sorties: u.sorties ?? 0, detections: u.detections ?? 0,
+      savedL: u.savedL ?? null, amount: u.amount ?? null,
+    });
+  }
+  listUsage(tenantId = null, limit = 500) {
+    const arr = tenantId ? this.usage.filter(u => u.tenantId === tenantId) : this.usage;
+    return arr.slice().sort((a, b) => b.ts - a.ts).slice(0, limit);
   }
 }

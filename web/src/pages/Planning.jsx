@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { CHART } from '../theme.js';
 import { HARDWARE_PHOTOS } from '../assets.js';
+import { api } from '../api.js';
+import { BRAND, BRAND_FULL, OFFICIAL_URL, TEAM, VERSION } from '../platform-info.js';
 
 /**
  * 平台方案页 —— 对外展示用
@@ -135,15 +137,137 @@ const API_ROWS = [
   ['POST', '/api/ingest/batch', '批量补传'],
   ['WS', '/ws/telemetry', '设备遥测接入'],
   ['WS', '/ws/live', '前端实时订阅'],
+  /* ---- 平台底座：多租户 / 设备接入 / 计量结算 ---- */
+  ['GET', '/api/tenancy/identity', '当前身份、角色与可见地块'],
+  ['POST', '/api/tenancy/login', '按 userId 换取身份令牌'],
+  ['GET', '/api/tenancy/tenants', '租户列表'],
+  ['POST', '/api/tenancy/tenants', '创建租户（仅平台运营方）'],
+  ['GET', '/api/tenancy/members', '成员与角色'],
+  ['POST', '/api/tenancy/members', '邀请成员 / 分配角色'],
+  ['GET', '/api/fields', '地块列表（按身份过滤可见范围）'],
+  ['POST', '/api/fields', '登记地块（自动归属所属租户）'],
+  ['GET', '/api/access/devices', '接入设备与健康度评分'],
+  ['POST', '/api/access/devices/register', '注册设备并签发 API Key'],
+  ['POST', '/api/access/devices/{id}/revoke', '吊销设备密钥'],
+  ['POST', '/api/access/self-register', '第三方设备自助接入'],
+  ['POST', '/api/access/heartbeat', '设备心跳'],
+  ['GET', '/api/access/commands', '指令下发记录'],
+  ['POST', '/api/access/commands', '向设备下发作业单'],
+  ['POST', '/api/access/commands/{id}/ack', '指令回执'],
+  ['GET', '/api/metering/price', '价目表与计量单位'],
+  ['GET', '/api/metering/usage', '用量记录'],
+  ['POST', '/api/metering/usage', '上报用量'],
+  ['GET', '/api/metering/invoices', '按账期的租户账单'],
+  ['GET', '/api/metering/metrics', '平台经营指标'],
+  ['GET', '/api/platform/services', '平台服务能力说明'],
 ];
 
 export default function Planning() {
+  const [baseline, setBaseline] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    api.baseline()
+      .then(b => { if (alive) setBaseline(b); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
   return (
     <>
       <div className="page-head">
         <h2>平台方案 · 能力总览</h2>
         <p>按能力模块说明平台解决的问题；设备接入协议与接口清单见本页下方。</p>
       </div>
+
+      <div className="card" style={{ marginBottom: 12 }}>
+        <h3>
+          平台信息
+          <span className="tag">{VERSION}</span>
+        </h3>
+        <div className="grid g2" style={{ gap: 10 }}>
+          <div style={{ padding: '12px', background: 'var(--panel-2)', border: '1px solid var(--accent)' }}>
+            <div className="small" style={{ fontWeight: 700, marginBottom: 8, color: 'var(--accent)' }}>平台名称</div>
+            <div className="xs dim" style={{ lineHeight: 1.8 }}>
+              <div style={{ fontWeight: 700 }}>{BRAND}</div>
+              <div>{BRAND_FULL}</div>
+              <div style={{ marginTop: 6 }}>建设单位：{TEAM}</div>
+            </div>
+          </div>
+          <div style={{ padding: '12px', background: 'var(--panel-2)', border: '1px solid var(--accent-2)' }}>
+            <div className="small" style={{ fontWeight: 700, marginBottom: 8, color: 'var(--accent-2)' }}>官方网站</div>
+            <div className="xs dim" style={{ lineHeight: 1.8 }}>
+              <a className="mono" href={OFFICIAL_URL} target="_blank" rel="noreferrer noopener"
+                style={{ wordBreak: 'break-all' }}>{OFFICIAL_URL}</a>
+              <div style={{ marginTop: 6 }}>公网直接访问，功能与本地演示完全一致（同一套计算内核）。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {baseline && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <h3>
+            申报书实测基准场景
+            <span className="tag">30亩示范田 · 可现场复现</span>
+          </h3>
+          <p className="xs dim" style={{ marginBottom: 10, lineHeight: 1.7 }}>
+            实时演示跑的是内置模拟器，识别结果随时间波动；申报材料引用的数字必须能被当场复现。
+            因此平台把「{baseline.field.mu}亩示范田（{baseline.field.areaHa} ha，{baseline.field.gridSizeM} m×{baseline.field.gridSizeM} m 网格，{baseline.field.zones} 个管理分区）」
+            的实测基准场景固化为确定性数据 —— 下面每一个数字都由与在线演示完全相同的规划算法算出，
+            材料里的数字与现场看到的数字因此必然一致。
+          </p>
+          <div className="grid g3" style={{ gap: 10 }}>
+            {[
+              ['全田覆盖', [
+                ['航程', `${baseline.full.lengthM} m`],
+                ['耗时', `${baseline.full.minutes} min`],
+                ['药耗', `${baseline.full.volumeL} L`],
+                ['耗电', `${baseline.full.batteryPct} %`],
+              ], 'var(--accent)'],
+              ['靶向点喷', [
+                ['病灶格', `${baseline.target.targetCells} 个`],
+                ['耗时', `${baseline.target.minutes} min`],
+                ['药耗', `${baseline.target.volumeL} L`],
+                ['覆盖率 / 溢出', `${baseline.target.coverage} / ${baseline.target.spillAreaHa} 亩`],
+              ], 'var(--accent-2)'],
+              ['节药与提效', [
+                ['药液节约率', `${baseline.saving.savedRatio} %`],
+                ['相对人工耗时', `−${baseline.vsManual.minutes} %`],
+                ['相对人工航程', `−${baseline.vsManual.lengthM} %`],
+                ['相对人工转弯', `−${baseline.vsManual.turningShare} %`],
+              ], 'var(--danger)'],
+            ].map(([title, rows, color]) => (
+              <div key={title} style={{ padding: '12px', background: 'var(--panel-2)', border: `1px solid ${color}` }}>
+                <div className="small" style={{ fontWeight: 700, marginBottom: 8, color }}>{title}</div>
+                {rows.map(([l, v]) => (
+                  <div key={l} className="row" style={{ marginBottom: 4 }}>
+                    <span className="xs mute">{l}</span>
+                    <span className="spacer" />
+                    <span className="mono" style={{ fontSize: 15, fontWeight: 700, color }}>{v}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+          <div className="grid g3" style={{ gap: 10, marginTop: 10 }}>
+            {[
+              ['流量÷速度', `${baseline.ratio.flowPerSpeed} L/(m·min)`],
+              ['可行速度区间', `${baseline.ratio.speedRange.min} – ${baseline.ratio.speedRange.max} m/s`],
+              ['寻优空间', `${baseline.search.headings}×${baseline.search.speeds}×${baseline.search.swaths} = ${baseline.search.combinations} 组`],
+              ['目标权重', `经济 ${baseline.search.weights.economy} / 快速 ${baseline.search.weights.speed} / 环保 ${baseline.search.weights.eco}`],
+              ['重喷率', `${(baseline.vsManual.overlapManual * 100).toFixed(1)}% → ${(baseline.vsManual.overlapAuto * 100).toFixed(1)}%`],
+              ['靶向作业单', `${baseline.target.targetCells} 格 · ${baseline.target.clusters} 个病灶簇`],
+              ['靶向覆盖率', `${baseline.target.coverage}（溢出 ${baseline.target.spillAreaHa} 亩）`],
+            ].map(([l, v]) => (
+              <div key={l} style={{ padding: '9px 10px', background: 'var(--panel-2)', border: '1px solid var(--line)' }}>
+                <div className="xs mute">{l}</div>
+                <div className="mono" style={{ fontSize: 14, fontWeight: 700, marginTop: 3 }}>{v}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid g2" style={{ marginBottom: 12 }}>
         {CAPABILITY.map(c => (

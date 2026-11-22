@@ -11,7 +11,7 @@ import { dirname } from 'node:path';
 const nz = (v) => (v === undefined ? null : v);
 
 export class Store {
-  constructor(dbPath = './data/suiyun.db') {
+  constructor(dbPath = process.env.SUIYUN_DB || './data/suiyun.db') {
     if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });
     this.db = new DatabaseSync(dbPath);
     this.migrate();
@@ -63,10 +63,41 @@ export class Store {
         ts INTEGER, mission_id TEXT, grid_row INTEGER, grid_col INTEGER,
         disease TEXT, volume_l REAL, dose REAL, speed REAL, agent TEXT
       );
+
+      /* ---- 平台底座：租户 / 成员 / 地块归属 / 设备接入 / 指令 / 计量 ---- */
+      CREATE TABLE IF NOT EXISTS tenants (
+        tenant_id TEXT PRIMARY KEY, name TEXT, type TEXT,
+        contact TEXT, created_at INTEGER
+      );
+      CREATE TABLE IF NOT EXISTS members (
+        user_id TEXT PRIMARY KEY, tenant_id TEXT, name TEXT, role TEXT,
+        field_ids TEXT, created_at INTEGER
+      );
+      CREATE TABLE IF NOT EXISTS device_access (
+        device_id TEXT PRIMARY KEY, tenant_id TEXT, owner_user_id TEXT,
+        kind TEXT, name TEXT, model TEXT, access_state TEXT,
+        salt TEXT, registered_at INTEGER, last_seen INTEGER, online INTEGER DEFAULT 0
+      );
+      CREATE TABLE IF NOT EXISTS commands (
+        command_id TEXT PRIMARY KEY, device_id TEXT, tenant_id TEXT,
+        type TEXT, mission_id TEXT, payload TEXT, state TEXT,
+        issued_at INTEGER, acked_at INTEGER, done_at INTEGER
+      );
+      CREATE TABLE IF NOT EXISTS usage_records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts INTEGER, tenant_id TEXT, mission_id TEXT, type TEXT,
+        area_mu REAL, volume_l REAL, minutes REAL, sorties INTEGER, detections INTEGER,
+        saved_l REAL, amount REAL
+      );
     `);
     this.migrateMissions();
     if (!this.db.prepare('PRAGMA table_info(detections)').all().some(column => column.name === 'image_url')) {
       this.db.exec('ALTER TABLE detections ADD COLUMN image_url TEXT');
+    }
+    // 地块归属租户（多租户底座）
+    if (!this.db.prepare('PRAGMA table_info(fields)').all().some(column => column.name === 'tenant_id')) {
+      this.db.exec('ALTER TABLE fields ADD COLUMN tenant_id TEXT');
+      this.db.exec('ALTER TABLE fields ADD COLUMN owner_user_id TEXT');
     }
   }
 
@@ -111,15 +142,18 @@ export class Store {
   // ---- 地块 ----
   upsertField(f) {
     this.db.prepare(`INSERT OR REPLACE INTO fields
-      (id,name,width_m,height_m,grid_rows,grid_cols,obstacles,area_ha) VALUES (?,?,?,?,?,?,?,?)`)
+      (id,name,width_m,height_m,grid_rows,grid_cols,obstacles,area_ha,tenant_id,owner_user_id)
+      VALUES (?,?,?,?,?,?,?,?,?,?)`)
       .run(nz(f.id), nz(f.name), nz(f.widthM), nz(f.heightM), nz(f.gridRows), nz(f.gridCols),
-        JSON.stringify(f.obstacles || []), nz(f.totalAreaHa?.() ?? (f.widthM * f.heightM) / 10000));
+        JSON.stringify(f.obstacles || []), nz(f.totalAreaHa?.() ?? (f.widthM * f.heightM) / 10000),
+        nz(f.tenantId), nz(f.ownerUserId));
   }
   listFields() {
     return this.db.prepare(`SELECT * FROM fields`).all().map(r => ({
       id: r.id, name: r.name, widthM: r.width_m, heightM: r.height_m,
       gridRows: r.grid_rows, gridCols: r.grid_cols,
       obstacles: JSON.parse(r.obstacles || '[]'), areaHa: r.area_ha,
+      tenantId: r.tenant_id ?? null, ownerUserId: r.owner_user_id ?? null,
     }));
   }
   getField(id) { return this.listFields().find(f => f.id === id); }
@@ -227,7 +261,24 @@ export class Store {
     this.db.prepare(`UPDATE missions SET status=? WHERE mission_id=?`).run(status, missionId);
   }
   listMissions(limit = 200) {
-    return this.db.prepare(`SELECT * FROM missions ORDER BY created_at DESC LIMIT ?`).all(limit).map(r => ({
+    return this.db.prepare(`SELECT * FROM missions ORDER BY created_at DESC LIMIT ?`).all(limit).map(r => this._missionRow(r));
+  }
+
+  /**
+   * 按任务类型取任务（不限条数上限语义：只取该类型最新 limit 条）。
+   *
+   * 为什么需要它：复核任务（recheck）的产生速率远高于施药任务，
+   * 一次「最新 N 条」窗口会被复核任务占满，导致施药任务被挤出窗口，
+   * 节药率统计随之变成「待作业」。按类型取可以保证口径稳定。
+   */
+  listMissionsByType(type, limit = 200) {
+    return this.db.prepare(
+      `SELECT * FROM missions WHERE type=? ORDER BY created_at DESC LIMIT ?`)
+      .all(type, limit).map(r => this._missionRow(r));
+  }
+
+  _missionRow(r) {
+    return {
       missionId: r.mission_id, createdAt: r.created_at, type: r.type,
       grid: { row: r.grid_row, col: r.grid_col }, disease: r.disease,
       spray: {
@@ -247,7 +298,7 @@ export class Store {
       status: r.status, cells: JSON.parse(r.cell_ids || '[]'),
       zoneId: r.zone_id ?? r.zone_name?.match(/^([A-Z])/)?.[1] ?? null,
       zoneName: r.zone_name,
-    }));
+    };
   }
 
   // ---- 联动事件 ----
@@ -286,5 +337,117 @@ export class Store {
   countRows(table) {
     try { return this.db.prepare(`SELECT COUNT(*) c FROM ${table}`).get().c; }
     catch { return 0; }
+  }
+
+  /* ================================================================
+   * 平台底座：租户 / 成员 / 设备接入 / 指令 / 计量
+   * ================================================================ */
+
+  // ---- 租户 ----
+  upsertTenant(t) {
+    this.db.prepare(`INSERT OR REPLACE INTO tenants
+      (tenant_id,name,type,contact,created_at) VALUES (?,?,?,?,?)`)
+      .run(nz(t.id || t.tenantId), nz(t.name), nz(t.type || 'farm'),
+        nz(t.contact), nz(t.createdAt ?? Date.now()));
+  }
+  listTenants() {
+    return this.db.prepare(`SELECT * FROM tenants ORDER BY created_at`).all().map(r => ({
+      id: r.tenant_id, name: r.name, type: r.type, contact: r.contact, createdAt: r.created_at,
+    }));
+  }
+  getTenant(id) { return this.listTenants().find(t => t.id === id) || null; }
+
+  // ---- 成员 ----
+  upsertMember(m) {
+    this.db.prepare(`INSERT OR REPLACE INTO members
+      (user_id,tenant_id,name,role,field_ids,created_at) VALUES (?,?,?,?,?,?)`)
+      .run(nz(m.userId), nz(m.tenantId), nz(m.name), nz(m.role),
+        JSON.stringify(m.fieldIds || []), nz(m.createdAt ?? Date.now()));
+  }
+  listMembers(tenantId = null) {
+    const rows = tenantId
+      ? this.db.prepare(`SELECT * FROM members WHERE tenant_id=? ORDER BY created_at`).all(tenantId)
+      : this.db.prepare(`SELECT * FROM members ORDER BY created_at`).all();
+    return rows.map(r => ({
+      userId: r.user_id, tenantId: r.tenant_id, name: r.name, role: r.role,
+      fieldIds: JSON.parse(r.field_ids || '[]'), createdAt: r.created_at,
+    }));
+  }
+  getMember(userId) {
+    const r = this.db.prepare(`SELECT * FROM members WHERE user_id=?`).get(userId);
+    if (!r) return null;
+    return {
+      userId: r.user_id, tenantId: r.tenant_id, name: r.name, role: r.role,
+      fieldIds: JSON.parse(r.field_ids || '[]'), createdAt: r.created_at,
+    };
+  }
+
+  // ---- 设备接入 ----
+  upsertDeviceAccess(d) {
+    this.db.prepare(`INSERT OR REPLACE INTO device_access
+      (device_id,tenant_id,owner_user_id,kind,name,model,access_state,salt,registered_at,last_seen,online)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(nz(d.deviceId), nz(d.tenantId), nz(d.ownerUserId), nz(d.kind), nz(d.name), nz(d.model),
+        nz(d.accessState), nz(d.salt), nz(d.registeredAt ?? Date.now()),
+        nz(d.lastSeen ?? Date.now()), d.online ? 1 : 0);
+  }
+  listDeviceAccess() {
+    return this.db.prepare(`SELECT * FROM device_access ORDER BY registered_at`).all().map(r => ({
+      deviceId: r.device_id, tenantId: r.tenant_id, ownerUserId: r.owner_user_id,
+      kind: r.kind, name: r.name, model: r.model, accessState: r.access_state,
+      registeredAt: r.registered_at, lastSeen: r.last_seen, online: !!r.online,
+    }));
+  }
+  getDeviceAccess(deviceId) {
+    const r = this.db.prepare(`SELECT * FROM device_access WHERE device_id=?`).get(deviceId);
+    if (!r) return null;
+    return {
+      deviceId: r.device_id, tenantId: r.tenant_id, ownerUserId: r.owner_user_id,
+      kind: r.kind, name: r.name, model: r.model, accessState: r.access_state,
+      salt: r.salt, registeredAt: r.registered_at, lastSeen: r.last_seen, online: !!r.online,
+    };
+  }
+  setDeviceAccessState(deviceId, state) {
+    this.db.prepare(`UPDATE device_access SET access_state=? WHERE device_id=?`).run(state, deviceId);
+  }
+
+  // ---- 指令 ----
+  insertCommand(c) {
+    this.db.prepare(`INSERT OR REPLACE INTO commands
+      (command_id,device_id,tenant_id,type,mission_id,payload,state,issued_at,acked_at,done_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?)`)
+      .run(nz(c.commandId), nz(c.deviceId), nz(c.tenantId), nz(c.type), nz(c.missionId),
+        JSON.stringify(c.payload || {}), nz(c.state),
+        nz(c.issuedAt), nz(c.ackedAt), nz(c.doneAt));
+  }
+  listCommands(deviceId = null, limit = 200) {
+    const rows = deviceId
+      ? this.db.prepare(`SELECT * FROM commands WHERE device_id=? ORDER BY issued_at DESC LIMIT ?`).all(deviceId, limit)
+      : this.db.prepare(`SELECT * FROM commands ORDER BY issued_at DESC LIMIT ?`).all(limit);
+    return rows.map(r => ({
+      commandId: r.command_id, deviceId: r.device_id, tenantId: r.tenant_id,
+      type: r.type, missionId: r.mission_id, payload: JSON.parse(r.payload || '{}'),
+      state: r.state, issuedAt: r.issued_at, ackedAt: r.acked_at, doneAt: r.done_at,
+    }));
+  }
+
+  // ---- 计量 ----
+  insertUsage(u) {
+    this.db.prepare(`INSERT INTO usage_records
+      (ts,tenant_id,mission_id,type,area_mu,volume_l,minutes,sorties,detections,saved_l,amount)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(nz(u.ts ?? Date.now()), nz(u.tenantId), nz(u.missionId), nz(u.type),
+        nz(u.areaMu), nz(u.volumeL), nz(u.minutes), nz(u.sorties ?? 0), nz(u.detections ?? 0),
+        nz(u.savedL), nz(u.amount));
+  }
+  listUsage(tenantId = null, limit = 500) {
+    const rows = tenantId
+      ? this.db.prepare(`SELECT * FROM usage_records WHERE tenant_id=? ORDER BY ts DESC LIMIT ?`).all(tenantId, limit)
+      : this.db.prepare(`SELECT * FROM usage_records ORDER BY ts DESC LIMIT ?`).all(limit);
+    return rows.map(r => ({
+      ts: r.ts, tenantId: r.tenant_id, missionId: r.mission_id, type: r.type,
+      areaMu: r.area_mu, volumeL: r.volume_l, minutes: r.minutes,
+      sorties: r.sorties, detections: r.detections, savedL: r.saved_l, amount: r.amount,
+    }));
   }
 }

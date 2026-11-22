@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback, lazy, Suspense } from
 import { api, subscribe, MODE } from './api.js';
 import Overview from './pages/Overview.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
+import { BRAND, BRAND_FULL, OFFICIAL_URL, OFFICIAL_URL_TEXT, TEAM, VERSION } from './platform-info.js';
 
 /*
  * 按板块分包加载。
@@ -19,17 +20,32 @@ const Planner     = lazy(() => import('./pages/Planner.jsx'));
 const Planning    = lazy(() => import('./pages/Planning.jsx'));
 const Farm        = lazy(() => import('./pages/Farm.jsx'));
 const Architecture = lazy(() => import('./pages/Architecture.jsx'));
+const Tenancy     = lazy(() => import('./pages/Tenancy.jsx'));
+const Access      = lazy(() => import('./pages/Access.jsx'));
+const Metering    = lazy(() => import('./pages/Metering.jsx'));
+const Developers  = lazy(() => import('./pages/Developers.jsx'));
+const Mobile      = lazy(() => import('./pages/Mobile.jsx'));
 
 /**
  * 板块设置（信息架构）
  *
- * 相对原「金穗卫士」平台的 15 个板块做了删改，取其精华去其糟粕：
+ * 相对早期版本的 15 个板块做了删改，取其精华去其糟粕：
  *   保留 —— 实时监测（含实景与地图）、数据分析、施药决策（并入路径规划与农情策略）、
  *           策略库（独立为「农情与策略」）、空地协同调度（即空地联动）
  *   合并 —— 系统首页 + 指挥中心 + 病害识别 → 总览（KPI + 地块态势 + 作业单）
  *           地面站 + 多机协同规划 + 航线与处方 → 路径规划（一个规划器统一算）
  *   新增 —— 农情与策略（气象、施药窗口、药剂与安全间隔期、病种实拍图）
  *   舍弃 —— 3D 实景、飘移仿真、病害推演、智能助手（演示性占位，无可验证结论）
+ *
+ * 平台底座（低空经济赛道新增）：
+ *   租户与权限 —— 平台服务哪些主体、谁能看什么
+ *   设备接入   —— 第三方设备怎么进来、怎么鉴权、怎么吊销
+ *   计量结算   —— 平台按什么口径收费、账单与经营指标
+ *   开发者门户 —— 第三方开发者接一次设备要做什么、写多少代码
+ *   三端联动   —— PC 调度台 / 掌上端 / 公众号怎么协同
+ *
+ * 这五块是「平台化」的核心证据：评委看完就能确认
+ * 我们的工作量在平台的设计与开发，而不只是硬件集成。
  */
 const NAV = [
   { id: 'overview',  label: '总览',     sub: '平台全局指标与地块态势' },
@@ -39,6 +55,11 @@ const NAV = [
   { id: 'agro',      label: '农情策略', sub: '气象、施药窗口与策略库' },
   { id: 'planner',   label: '路径规划', sub: '自动规划与比例求解' },
   { id: 'planning',  label: '平台方案', sub: '能力、硬件与接入协议' },
+  { id: 'tenancy',   label: '租户与权限', sub: '五类主体与可见范围裁决' },
+  { id: 'access',    label: '设备接入', sub: '第三方设备鉴权与调度' },
+  { id: 'developers',label: '开发者门户', sub: '接入流程、代码与模拟器' },
+  { id: 'mobile',    label: '三端联动', sub: 'PC / 掌上端 / 公众号协同' },
+  { id: 'metering',  label: '计量结算', sub: '价目表、账单与经营指标' },
   { id: 'farm',      label: '农户服务', sub: '今日行动清单' },
   { id: 'arch',      label: '系统架构', sub: '场景与流程图' },
 ];
@@ -69,6 +90,8 @@ export default function App() {
   const [dimCache, setDimCache] = useState({});
   const [lastMsg, setLastMsg] = useState(null);
   const [bootError, setBootError] = useState(null);
+  // 当前登录身份（平台底座）。默认取演示身份，登录后由后端返回真实身份。
+  const [identity, setIdentity] = useState(null);
 
   // ---- 板块 ↔ URL hash 双向同步 ----
   useEffect(() => {
@@ -99,6 +122,9 @@ export default function App() {
         setMeta(m); setDevices(d); setTelemetry(t); setDetections(det);
         setMissions(ms); setEvents(ev.events || []); setOverview(ov); setBriefing(br);
         setLinkMetrics(await api.linkMetrics());
+        // 身份与平台基础数据一起加载，避免租户页首次进入时闪烁
+        const idn = await api.identity();
+        if (alive && idn?.identity) setIdentity(idn.identity);
       } catch (e) {
         if (alive) setBootError(e.message);
       }
@@ -170,6 +196,8 @@ export default function App() {
   const shared = useMemo(() => ({
     meta, devices, telemetry, detections, missions, events,
     linkMetrics, overview, briefing, mode, lastMsg,
+    identity,
+    onIdentityChange: setIdentity,
     refreshOverview: async () => {
       try {
         const [ov, br, lm] = await Promise.all([api.overview(), api.briefing(), api.linkMetrics()]);
@@ -178,20 +206,22 @@ export default function App() {
     },
     loadDimension,
   }), [meta, devices, telemetry, detections, missions, events,
-      linkMetrics, overview, briefing, mode, lastMsg, loadDimension]);
+      linkMetrics, overview, briefing, mode, lastMsg, loadDimension, identity]);
 
   const Page = {
     overview: Overview, realtime: Realtime, linkage: Linkage,
     analytics: Analytics, agro: Agro, planner: Planner, planning: Planning,
     farm: Farm, arch: Architecture,
+    tenancy: Tenancy, access: Access, metering: Metering, developers: Developers,
+    mobile: Mobile,
   }[page];
 
   return (
     <div className="app">
       <aside className="sidebar">
         <div className="brand">
-          <h1>穗云智策</h1>
-          <span className="sub">空地协同精准植保智能决策云平台</span>
+          <h1>{BRAND}</h1>
+          <span className="sub">{BRAND_FULL}</span>
         </div>
         <nav className="nav">
           {NAV.map((n, i) => (
@@ -215,6 +245,20 @@ export default function App() {
             <span className="dot" />
             {mode === MODE.LIVE ? '实时接入' : '演示模式'}
           </span>
+          {identity && (
+            <span className="badge identity" title={`当前身份：${identity.name}（${identity.role}）`}>
+              <span className="mono">{identity.name}</span>
+              <span className="mono" style={{ opacity: .85, fontWeight: 400 }}>
+                {identity.tenantName || identity.tenantId}
+              </span>
+            </span>
+          )}
+          <a className="official" href={OFFICIAL_URL} target="_blank" rel="noreferrer noopener"
+            title={`${BRAND} ${BRAND_FULL} 官方网站`}>
+            <span className="label">官方网站</span>
+            <span className="mono url">{OFFICIAL_URL_TEXT}</span>
+          </a>
+          <span className="copyright">{TEAM} · {VERSION}</span>
         </div>
       </aside>
 

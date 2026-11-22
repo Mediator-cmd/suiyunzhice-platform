@@ -12,6 +12,7 @@ import {
 } from './schema.js';
 import { SPRAY_STRATEGIES, SPRAY_WINDOW_RULES } from './agronomy.js';
 import { Field, autoPlan, manualBaseline, compareWithManual } from './planner.js';
+import { BASELINE_TARGET_CELLS, BASELINE_PARAMS, BASELINE_SCENARIO_ID } from './baseline.js';
 
 /**
  * 河北省唐山市 30 亩示范田 —— 200m × 100m = 20000 m² = 30 亩 = 2 ha，
@@ -65,22 +66,119 @@ export class Platform {
       .map(c => ({ row: c.row, col: c.col }));
   }
 
-  /** 自动规划 + 与人工手画航线的对比 */
+  /**
+   * 自动规划 + 与人工手画航线的对比。
+   *
+   * opts.scenario = 'baseline' 时返回「申报书实测基准场景」：
+   * 靶向网格固定为 19 格，数字与申报材料完全一致。
+   * 缺省（实时）模式下靶向网格随识别结果动态变化。
+   */
   getPlan(opts = {}) {
     const key = JSON.stringify(opts);
     const planOpts = { ...opts };
+    const isBaseline = planOpts.scenario === 'baseline';
     if (planOpts.mode === 'target') {
-      // 靶向网格随识别结果动态变化，不做缓存
-      const cells = this.targetCellsFor();
-      if (cells.length) planOpts.targetCells = cells;
-    } else if (this.planCache.has(key)) {
+      if (isBaseline) {
+        planOpts.targetCells = BASELINE_TARGET_CELLS;
+        planOpts.headingDeg = BASELINE_PARAMS.headingDeg;
+        planOpts.speedMs = BASELINE_PARAMS.speedMs;
+        planOpts.swathM = BASELINE_PARAMS.swathM;
+      } else {
+        // 靶向网格随识别结果动态变化，不做缓存
+        const cells = this.targetCellsFor();
+        if (cells.length) planOpts.targetCells = cells;
+      }
+    }
+    if (planOpts.mode !== 'target' && this.planCache.has(key)) {
       return this.planCache.get(key);
     }
     const result = autoPlan(this.field, planOpts);
     const manual = manualBaseline(this.field, planOpts);
     const out = { ...result, comparison: compareWithManual(result.best, manual) };
+    if (isBaseline) out.scenario = BASELINE_SCENARIO_ID;
     if (planOpts.mode !== 'target') this.planCache.set(key, out);
     return out;
+  }
+
+  /**
+   * 申报书实测基准场景的完整一组数字（全田 + 靶向 + 对比 + 节药）。
+   * 前端「实测基准」卡片与申报材料共用这一份，保证口径同源。
+   */
+  baselineReport() {
+    const full = autoPlan(this.field, {
+      mode: 'full',
+      swathM: BASELINE_PARAMS.fullSwathM,
+      targetDoseLha: BASELINE_PARAMS.targetDoseLha,
+    });
+    const target = autoPlan(this.field, {
+      mode: 'target',
+      targetCells: BASELINE_TARGET_CELLS,
+      headingDeg: BASELINE_PARAMS.headingDeg,
+      speedMs: BASELINE_PARAMS.speedMs,
+      swathM: BASELINE_PARAMS.swathM,
+      targetDoseLha: BASELINE_PARAMS.targetDoseLha,
+    });
+    const manualFull = manualBaseline(this.field, { mode: 'full', swathM: 5.0 });
+    const fullCmp = compareWithManual(full.best, manualFull);
+
+    const f = full.best;
+    const t = target.best;
+    const fr = t.route;
+    const tr = t.ratio;
+    const fScore = f.score?.detail || {};
+    const tScore = t.score?.detail || {};
+
+    const fullVolL = f.ratio?.totalVolumeL ?? 0;
+    const targetVolL = tr?.totalVolumeL ?? 0;
+
+    return {
+      scenario: BASELINE_SCENARIO_ID,
+      field: {
+        areaHa: +this.field.totalAreaHa().toFixed(2),
+        mu: +(this.field.totalAreaHa() * 15).toFixed(0),
+        gridSizeM: this.field.cellW,
+        zones: this.field.zones().length,
+      },
+      full: {
+        headingDeg: f.headingDeg, speedMs: f.speedMs, swathM: f.swathM,
+        lengthM: fScore.lengthM, minutes: fScore.totalMinutes,
+        volumeL: fullVolL, batteryPct: fScore.batteryPct,
+        overlap: fScore.overlapRatio,
+      },
+      target: {
+        headingDeg: t.headingDeg, speedMs: t.speedMs, swathM: t.swathM,
+        targetCells: fr?.nTargetCells ?? BASELINE_TARGET_CELLS.length,
+        clusters: fr?.nClusters ?? 0,
+        lengthM: tScore.lengthM, minutes: tScore.totalMinutes,
+        volumeL: targetVolL, batteryPct: tScore.batteryPct,
+        coverage: fr?.targetCoverage ?? null,
+        spillAreaHa: fr?.spillAreaHa ?? null,
+        areaHa: fr?.regionAreaHa ?? null,
+      },
+      saving: {
+        fullVolumeL: +fullVolL.toFixed(1),
+        targetVolumeL: +targetVolL.toFixed(2),
+        savedL: +(fullVolL - targetVolL).toFixed(2),
+        savedRatio: fullVolL > 0 ? +((1 - targetVolL / fullVolL) * 100).toFixed(1) : null,
+      },
+      ratio: {
+        flowPerSpeed: tr?.flowPerSpeed ?? null,
+        speedRange: tr?.speedRange ?? null,
+        dutyCycle: tr?.dutyCycle ?? null,
+      },
+      search: {
+        headings: 8, speeds: 5, swaths: 4,
+        combinations: 8 * 5 * 4,
+        weights: { economy: 0.4, speed: 0.35, eco: 0.25 },
+      },
+      vsManual: {
+        minutes: fullCmp.gains.minutes,
+        lengthM: fullCmp.gains.lengthM,
+        turningShare: fullCmp.gains.turningShare,
+        overlapAuto: fullCmp.auto.overlap,
+        overlapManual: fullCmp.manual.overlap,
+      },
+    };
   }
 
   /** 平台元数据：地块、病种字典、分析维度、规划目标定义 */

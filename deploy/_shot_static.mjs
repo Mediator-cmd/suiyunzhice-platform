@@ -9,7 +9,7 @@ import { mkdirSync } from 'node:fs';
  * 而不是只有几个空壳页面。
  */
 
-const EXE = 'C:/Users/ASUS/AppData/Local/ms-playwright/chromium-1208/chrome-win64/chrome.exe';
+const EXE = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const OUT = 'C:/Users/ASUS/_shots';
 mkdirSync(OUT, { recursive: true });
 
