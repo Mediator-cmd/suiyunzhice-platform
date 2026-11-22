@@ -160,6 +160,9 @@ const API_ROWS = [
   ['GET', '/api/metering/invoices', '按账期的租户账单'],
   ['GET', '/api/metering/metrics', '平台经营指标'],
   ['GET', '/api/platform/services', '平台服务能力说明'],
+  ['GET', '/api/openapi/stats', '开放平台接入现状统计'],
+  ['GET', '/api/farmer/messages', '农户服务推送内容（公众号 / 小程序）'],
+  ['POST', '/api/access/devices/{id}/restore', '恢复已吊销的设备密钥'],
 ];
 
 export default function Planning() {
