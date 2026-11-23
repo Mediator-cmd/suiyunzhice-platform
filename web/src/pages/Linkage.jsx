@@ -1,4 +1,5 @@
 import { CHART } from '../theme.js';
+import { dedupeLinkEvents } from '../events.js';
 import { CaseReplay } from '../components/Casebook.jsx';
 import React, { useMemo } from 'react';
 import {
@@ -18,8 +19,19 @@ const CHAIN_STEPS = [
 ];
 
 export default function Linkage({ meta, devices, detections, events, overview, caseId, selectCase, onNav }) {
+  /**
+   * 联动事件去重。
+   *
+   * 同一条事件会被推送两次：派单时推一次（未闭环），
+   * 地面机器人回传证据后再推一次（已闭环，eventId 不变）。
+   * 若不去重，统计口径会翻倍（同一件事算两次），
+   * 表格里也会出现重复行。取「后到的覆盖先到的」，
+   * 保留最新状态（闭环 / 时延）。
+   */
+  const uniqEvents = useMemo(() => dedupeLinkEvents(events), [events]);
+
   const stats = useMemo(() => {
-    const evs = events || [];
+    const evs = uniqEvents;
     if (!evs.length) return null;
     const totals = evs.map(e => e.latency.total).sort((a, b) => a - b);
     const avg = totals.reduce((a, b) => a + b, 0) / totals.length;
@@ -40,16 +52,16 @@ export default function Linkage({ meta, devices, detections, events, overview, c
       pending: evs.filter(e => !e.closed).length,
       recheck: evs.filter(e => e.chain.includes('robot_recheck')).length,
     };
-  }, [events]);
+  }, [uniqEvents]);
 
   const chartData = useMemo(() =>
-    (events || []).slice(0, 30).reverse().map(e => ({
+    uniqEvents.slice(0, 30).reverse().map(e => ({
       time: new Date(e.ts).toLocaleTimeString('zh-CN', { hour12: false }),
       感知决策: e.latency.sense,
       决策下发: e.latency.dispatch,
       执行到位: e.latency.act,
       总时延: e.latency.total,
-    })), [events]);
+    })), [uniqEvents]);
 
   const decisionRules = [
     { rule: '置信度低于阈值（默认 75%）', why: '模型不确定，需人眼近距确认', action: '派单机器人' },
@@ -146,7 +158,7 @@ export default function Linkage({ meta, devices, detections, events, overview, c
             </div>
           )}
           <div style={{ height: 180 }}>
-            {(events || []).length > 0 ? (
+            {uniqEvents.length > 0 ? (
               <LatencyChart data={chartData} />
             ) : (
               <div className="empty">等待联动事件…</div>
@@ -178,18 +190,18 @@ export default function Linkage({ meta, devices, detections, events, overview, c
       <div className="grid g-2-1">
         <div className="card pad0" style={{ overflow: 'hidden' }}>
           <div style={{ padding: '13px 15px 0' }}><h3>联动事件空间分布</h3></div>
-          <FieldMap field={meta?.field} devices={devices} detections={detections} events={events} height={360} />
+          <FieldMap field={meta?.field} devices={devices} detections={detections} events={uniqEvents} height={360} />
         </div>
         <div className="card">
           <h3>事件流</h3>
           <div className="table-scroll" style={{ maxHeight: 340 }}>
-            {(events || []).length === 0 ? (
+            {uniqEvents.length === 0 ? (
               <div className="empty">暂无联动事件</div>
             ) : (
               <table className="tbl">
                 <thead><tr><th>时间</th><th>网格</th><th>触发原因</th><th>闭环</th><th className="right">总时延</th></tr></thead>
                 <tbody>
-                  {events.map(e => (
+                  {uniqEvents.map(e => (
                     <tr key={e.eventId}>
                       <td className="mono xs mute nowrap">{new Date(e.ts).toLocaleTimeString('zh-CN', { hour12: false })}</td>
                       <td className="mono xs nowrap">R{e.grid.row}C{e.grid.col}</td>

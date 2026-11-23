@@ -1,4 +1,5 @@
 import { CHART, MAP } from '../theme.js';
+import { dedupeLinkEvents } from '../events.js';
 import React, { useMemo, useState } from 'react';
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip as RTooltip,
@@ -100,7 +101,7 @@ export default function Realtime({ meta, devices, telemetry, linkMetrics, mode, 
             field={meta?.field}
             devices={devices}
             detections={detections}
-            events={events}
+            events={dedupeLinkEvents(events)}
             missions={missions}
             height={404}
           />

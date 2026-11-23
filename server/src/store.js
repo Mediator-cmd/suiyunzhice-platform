@@ -99,6 +99,10 @@ export class Store {
       this.db.exec('ALTER TABLE fields ADD COLUMN tenant_id TEXT');
       this.db.exec('ALTER TABLE fields ADD COLUMN owner_user_id TEXT');
     }
+    // 地块真实地理锚点（地图叠加真实地形 / 卫星 / 街道底图用）
+    const fieldCols = this.db.prepare('PRAGMA table_info(fields)').all().map(c => c.name);
+    if (!fieldCols.includes('lat')) this.db.exec('ALTER TABLE fields ADD COLUMN lat REAL');
+    if (!fieldCols.includes('lon')) this.db.exec('ALTER TABLE fields ADD COLUMN lon REAL');
   }
 
   /**
@@ -142,11 +146,11 @@ export class Store {
   // ---- 地块 ----
   upsertField(f) {
     this.db.prepare(`INSERT OR REPLACE INTO fields
-      (id,name,width_m,height_m,grid_rows,grid_cols,obstacles,area_ha,tenant_id,owner_user_id)
-      VALUES (?,?,?,?,?,?,?,?,?,?)`)
+      (id,name,width_m,height_m,grid_rows,grid_cols,obstacles,area_ha,tenant_id,owner_user_id,lat,lon)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(nz(f.id), nz(f.name), nz(f.widthM), nz(f.heightM), nz(f.gridRows), nz(f.gridCols),
         JSON.stringify(f.obstacles || []), nz(f.totalAreaHa?.() ?? (f.widthM * f.heightM) / 10000),
-        nz(f.tenantId), nz(f.ownerUserId));
+        nz(f.tenantId), nz(f.ownerUserId), nz(f.lat), nz(f.lon));
   }
   listFields() {
     return this.db.prepare(`SELECT * FROM fields`).all().map(r => ({
@@ -154,6 +158,7 @@ export class Store {
       gridRows: r.grid_rows, gridCols: r.grid_cols,
       obstacles: JSON.parse(r.obstacles || '[]'), areaHa: r.area_ha,
       tenantId: r.tenant_id ?? null, ownerUserId: r.owner_user_id ?? null,
+      lat: r.lat ?? null, lon: r.lon ?? null,
     }));
   }
   getField(id) { return this.listFields().find(f => f.id === id); }

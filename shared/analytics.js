@@ -60,13 +60,28 @@ export class Analytics {
       : this.store.listMissions(500).filter(m => m.type === 'spray');
 
     // 植保效率提升（农户视角）
-    // 对照基准：若对同一块地做整田均匀喷施。
-    // 分母必须与 planner 的「全田作业单」自洽（整机喷幅下 25.2 L），
-    // 不能用「面积×剂量」的理想值 24 L —— 两个分母会算出两个节约率。
+    //
+    // 口径纪律（很重要，别把两个数混着用）：
+    //   ① 分区口径 savedRatioVsZone —— 「这些作业覆盖到的分区若整片喷洒需要多少药」
+    //      vs「实际靶向点喷用了多少药」。分区互不重叠、可相加，
+    //      因此作业单越多分子分母同步增长，比值稳定，可作为平台实时 KPI。
+    //   ② 全田口径 savedRatio —— 「全田均匀喷一次」vs「靶向喷一次」，
+    //      这是申报书 25.2 L → 0.57 L（97.7%）用的口径，
+    //      前提是**一次**全田对比**一次**靶向。
+    //      若拿「一次全田」去比「历史所有作业单的累加」，
+    //      作业单越多分子越大，比值会一路下滑，
+    //      现场看到的数字就无法复现申报材料 —— 所以实时 KPI 走 ①。
     const fieldAreaHa = this.fieldAreaHa();              // 示范田面积 ha
     const traditionalVolume = this.fullCoverageVolumeL() ?? (fieldAreaHa * 12);
     const preciseVolume = sprayed.reduce((a, m) => a + (m.plan?.estVolumeL || 0), 0);
-    // 只有产生喷洒任务时才计算节约率，避免除零与虚假 100%
+
+    // 分区口径：逐单的 uniformZoneL 可加（分区互不重叠）
+    const zoneUniformL = sprayed.reduce((a, m) => a + (m.plan?.uniformZoneL || 0), 0);
+    const zoneSavedL = sprayed.reduce((a, m) => a + (m.plan?.savedVsZoneL || 0), 0);
+    const savedRatioVsZone = zoneUniformL > 0
+      ? Math.max(0, (1 - preciseVolume / zoneUniformL) * 100) : null;
+
+    // 全田口径：只在「有喷洒任务」时给值，否则显示「待作业」而非编造数字
     const savedRatio = sprayed.length > 0 && traditionalVolume > 0
       ? Math.max(0, (1 - preciseVolume / traditionalVolume) * 100) : null;
 
@@ -101,10 +116,15 @@ export class Analytics {
       },
       // 植保效率提升（农户视角）
       efficiency: {
+        // 全田口径（申报书基准）：一次全田 vs 历史累加，仅作参考
         traditionalVolumeL: +traditionalVolume.toFixed(1),
         preciseVolumeL: +preciseVolume.toFixed(1),
         savedVolumeL: +(traditionalVolume - preciseVolume).toFixed(1),
         savedRatio: savedRatio == null ? null : +savedRatio.toFixed(1),
+        // 分区口径（平台实时 KPI）：口径自洽，不随作业单数量漂移
+        zoneUniformVolumeL: +zoneUniformL.toFixed(1),
+        zoneSavedVolumeL: +zoneSavedL.toFixed(1),
+        savedRatioVsZone: savedRatioVsZone == null ? null : +savedRatioVsZone.toFixed(1),
         recheckSaving: links.filter(e => e.chain.includes('robot_recheck')).length,
       },
     };
@@ -139,8 +159,12 @@ export class Analytics {
       g.confSum += d.confidence;
       g.diseases[d.disease] = (g.diseases[d.disease] || 0) + 1;
     }
-    const sprayed = new Set(missions.filter(m => m.type === 'spray')
-      .map(m => `${m.grid.row}_${m.grid.col}`));
+    // 施药任务按类型取：复核任务量远大于施药任务，
+    // 用「最新 N 条」窗口会把喷洒任务挤掉，「已施药」标记随之大面积失效。
+    const sprayMissions = this.store.listMissionsByType
+      ? this.store.listMissionsByType('spray', 5000)
+      : missions.filter(m => m.type === 'spray');
+    const sprayed = new Set(sprayMissions.map(m => `${m.grid.row}_${m.grid.col}`));
 
     const rows = [...grid.values()].map(g => ({
       row: g.row, col: g.col,

@@ -1,7 +1,16 @@
 import React, { useMemo } from 'react';
 import { FieldMap } from '../components/FieldMap.jsx';
+import { dedupeLinkEvents } from '../events.js';
 
 export default function Farm({ meta, briefing, detections, devices, events, missions }) {
+  // 病种名称与防治窗口统一取自 shared/schema.js 的病种字典，
+  // 不在本页再维护一份 —— 避免两处口径不一致。
+  // Hook 必须写在提前 return 之前，否则首帧与后续帧的 Hook 数量不一致。
+  const diseaseMeta = useMemo(
+    () => Object.fromEntries((meta?.diseases || []).map(d => [d.code, d])),
+    [meta]
+  );
+
   if (!briefing) return <div className="empty">正在生成农户简报…</div>;
 
   const byDisease = new Map();
@@ -9,13 +18,6 @@ export default function Farm({ meta, briefing, detections, devices, events, miss
     byDisease.set(d.disease, (byDisease.get(d.disease) || 0) + 1);
   }
   const sprayMissions = (missions || []).filter(m => m.type === 'spray');
-
-  // 病种名称与防治窗口统一取自 shared/schema.js 的病种字典，
-  // 不在本页再维护一份 —— 避免两处口径不一致。
-  const diseaseMeta = useMemo(
-    () => Object.fromEntries((meta?.diseases || []).map(d => [d.code, d])),
-    [meta]
-  );
 
   return (
     <>
@@ -77,7 +79,9 @@ export default function Farm({ meta, briefing, detections, devices, events, miss
 
       <div className="card pad0" style={{ overflow: 'hidden', marginBottom: 12 }}>
         <div style={{ padding: '13px 15px 0' }}><h3>我的地块</h3></div>
-        <FieldMap field={meta?.field} devices={devices} detections={detections} events={events} missions={missions} height={380} />
+        <FieldMap field={meta?.field} devices={devices} detections={detections}
+          events={dedupeLinkEvents(events)}
+          missions={missions} height={380} />
       </div>
 
       <div className="card">

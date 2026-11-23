@@ -17,7 +17,10 @@ import { PLAN_OBJECTIVES, SPRAY_RATIO_NOTE } from './schema.js';
 
 /** 田块：外接矩形 + 不作业障碍区（渠道、水塘、房舍） */
 export class Field {
-  constructor({ id, name, widthM, heightM, gridRows = 20, gridCols = 40, obstacles = [], soil = 'loam', zoneCols = 4, zoneRows = 2 }) {
+  constructor({
+    id, name, widthM, heightM, gridRows = 20, gridCols = 40, obstacles = [],
+    soil = 'loam', zoneCols = 4, zoneRows = 2, lat = null, lon = null,
+  }) {
     this.id = id;
     this.name = name;
     this.widthM = widthM;
@@ -26,6 +29,17 @@ export class Field {
     this.gridCols = gridCols;
     this.obstacles = obstacles;
     this.soil = soil;
+    /**
+     * 真实地理锚点（地块西北角中心点的经纬度）。
+     *
+     * 为什么加这个：地图要显示「实际地形」，就得把局部米制坐标
+     * 锚定到真实经纬度上，才能叠加真实高程 / 卫星 / 街道底图。
+     * 没有锚点时前端退回纯米制模式（离线兜底）。
+     *
+     * lat/lon 为 null 表示不启用真实地理底图。
+     */
+    this.lat = lat;
+    this.lon = lon;
     /** 管理分区：把田块划成 zoneCols × zoneRows 个作业分区（A~H） */
     this.zoneCols = zoneCols;
     this.zoneRows = zoneRows;

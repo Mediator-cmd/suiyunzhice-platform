@@ -33,6 +33,22 @@ const TENANT_TYPE_CN = {
   gov: '政府监管部门',
 };
 
+/**
+ * 平台服务的主体（口径与 shared/tenancy.js 的 ROLES 一一对应）
+ *
+ * 注意：植保技术员 / 农户与农场 / 合作社同属 farm 租户类型，
+ * 但可见范围不同（own 只看自己地块），因此在主体维度上单列一类。
+ * 这里的条数与 shared/tenancy.js 的角色数必须一致，标题数量由数组长度推导，
+ * 不写死数字，避免文案与实际展示对不上。
+ */
+const TENANT_SUBJECTS = [
+  { t: 'platform', n: '平台运营方', d: '跨租户管地块、设备、计费与审计', r: '全平台', c: 'var(--accent)' },
+  { t: 'farm', n: '农场 / 合作社', d: '名下地块全数据，派单与结算', r: '本租户', c: 'var(--accent-2)' },
+  { t: 'team', n: '作业队 / 飞手', d: '只接自己的任务，回传点位结果', r: '仅指派任务', c: 'var(--warn)' },
+  { t: 'agronomist', n: '植保技术员 / 农户', d: '只看自己地块的结论与今日行动清单', r: '仅本人地块', c: 'var(--robot)' },
+  { t: 'gov', n: '政府监管部门', d: '跨主体只读汇总，补贴核验', r: '全平台（只读）', c: 'var(--danger)' },
+];
+
 export default function Tenancy({ identity, onIdentityChange }) {
   const [data, setData] = useState(null);
   const [tenants, setTenants] = useState([]);
@@ -86,7 +102,7 @@ export default function Tenancy({ identity, onIdentityChange }) {
       <div className="page-head">
         <h2>租户与权限</h2>
         <p>
-          平台同时服务五类主体。数据可见范围由平台统一裁决 —— 不是"谁都能看全部"，
+          平台同时服务 {TENANT_SUBJECTS.length} 类主体。数据可见范围由平台统一裁决 —— 不是"谁都能看全部"，
           这既是合规要求，也是平台能被多主体接入的前提。
         </p>
       </div>
@@ -132,14 +148,9 @@ export default function Tenancy({ identity, onIdentityChange }) {
 
       {/* 主体类型 */}
       <div className="card" style={{ marginBottom: 16 }}>
-        <h3>五类主体 <span className="tag">平台服务的对象</span></h3>
+        <h3>{TENANT_SUBJECTS.length} 类主体 <span className="tag">平台服务的对象</span></h3>
         <div className="grid g4">
-          {[
-            { t: 'platform', n: '平台运营方', d: '跨租户管地块、设备、计费与审计', r: '全平台', c: 'var(--accent)' },
-            { t: 'farm', n: '农场 / 合作社', d: '名下地块全数据，派单与结算', r: '本租户', c: 'var(--accent-2)' },
-            { t: 'team', n: '作业队 / 飞手', d: '只接自己的任务，回传点位结果', r: '仅指派任务', c: 'var(--warn)' },
-            { t: 'gov', n: '政府监管部门', d: '跨主体只读汇总，补贴核验', r: '全平台（只读）', c: 'var(--danger)' },
-          ].map(x => (
+          {TENANT_SUBJECTS.map(x => (
             <div key={x.t} className="card" style={{ boxShadow: 'none', borderLeft: `3px solid ${x.c}` }}>
               <div className="small" style={{ color: x.c, marginBottom: 6 }}>{x.n}</div>
               <div className="xs mute" style={{ lineHeight: 1.7, minHeight: 46 }}>{x.d}</div>

@@ -367,7 +367,7 @@ export default function Planning() {
               <thead><tr><th>方法</th><th>路径</th><th>说明</th></tr></thead>
               <tbody>
                 {API_ROWS.map(([m, p, d]) => (
-                  <tr key={p}>
+                  <tr key={`${m}-${p}`}>
                     <td><span className="pill xs" style={{
                       color: m === 'GET' ? CHART.blue : m === 'POST' ? CHART.amber : CHART.green,
                     }}>{m}</span></td>

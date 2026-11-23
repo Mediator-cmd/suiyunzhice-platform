@@ -28,6 +28,16 @@ export function defaultField() {
     name: '河北省唐山市 30 亩示范田',
     widthM: 200, heightM: 100,          // 2 ha
     gridRows: 20, gridCols: 40,         // 5m × 5m 网格
+    /**
+     * 真实地理锚点：唐山市丰润区一带（北纬 39.63°、东经 118.18°）。
+     *
+     * 用它把平台的局部米制坐标锚到真实地理位置，
+     * 地图才能叠加真实高程（NASA terrarium）与街道底图（OSM）。
+     * 精度说明：这是示范田所在区域的公开坐标中心，
+     * 具体地块边界仍以平台内 5 m 网格为准。
+     */
+    lat: 39.6304,
+    lon: 118.1802,
     obstacles: [
       { x: 150, y: 0, w: 12, h: 30, label: '灌溉水渠' },
       { x: 40, y: 60, w: 25, h: 8, label: '地头房舍' },
@@ -194,6 +204,8 @@ export class Platform {
         cellSizeM: f.cellW, areaHa: f.totalAreaHa(),
         workableAreaHa: +f.workableAreaHa().toFixed(2),
         obstacles: f.obstacles,
+        // 真实地理锚点：地图据此叠加真实地形 / 卫星 / 街道底图
+        lat: f.lat ?? null, lon: f.lon ?? null,
         // 管理分区（A~H）—— 与地图上的虚线分区、作业单里的 zoneId 完全同源
         zoneCols: f.zoneCols, zoneRows: f.zoneRows,
         zones: f.zones().map(z => ({

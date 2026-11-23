@@ -11,11 +11,22 @@ import React from 'react';
  * 与参考图的扁平线稿风格一致。
  */
 
-/** 通用画布 */
+/**
+ * 通用画布
+ *
+ * 这里的 fill / stroke 三个属性是整个图标库的样式基础，不能省：
+ *   fill="none"          —— SVG 默认 fill 是黑色，不置 none 的话每个
+ *                            <rect> / <path> 都会被涂成实心黑块
+ *   stroke="currentColor" —— 线稿颜色跟随调用方传入的 color
+ *   strokeWidth="2.2"     —— 统一线宽；strokeLinecap/LineJoin 做圆头圆角
+ * 子元素里显式写了 fill="currentColor" 的（如病斑小圆点）会覆盖这里的 none。
+ */
 export function Icon({ size = 30, viewBox = '0 0 48 48', children, style, ...rest }) {
   return (
     <svg
       width={size} height={size} viewBox={viewBox}
+      fill="none" stroke="currentColor" strokeWidth="2.2"
+      strokeLinecap="round" strokeLinejoin="round"
       style={{ display: 'block', flexShrink: 0, overflow: 'visible', ...style }}
       {...rest}
     >

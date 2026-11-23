@@ -46,6 +46,7 @@ import {
   buildInvoice, buildInvoices, platformMetrics, COMMERCIAL_MODEL,
 } from '../../shared/metering.js';
 import { seedDemoPlatform } from '../../shared/demo.js';
+import { seedAgroHistory } from '../../shared/agroseed.js';
 import { ONBOARDING_STEPS, CODE_SAMPLES } from '../../shared/openplatform.js';
 import {
   FARMER_MSG_TYPES, buildFarmerMessage, toPushPayload, WECHAT_SERVICE, nonEmptyMessages,
@@ -899,6 +900,11 @@ if (SIM) {
 // 平台底座演示数据（与浏览器端共用 shared/demo.js）
 // 真实部署时若已有真实租户数据，用 skipTenants 避免覆盖。
 seedDemoPlatform(store, { skipTenants: store.listTenants().length > 0 });
+
+// 农情历史（与浏览器端共用 shared/agroseed.js）：
+// 过去 7 天的检出与作业记录，让六维统计冷启动即有内容。
+// 数字由规划器与病灶模型确定性生成，与实时派工同源。
+seedAgroHistory(store, FIELD, platform.getPlan().best);
 
 server.listen(PORT, () => {
   console.log(`穗云智策平台已启动: http://localhost:${PORT}`);

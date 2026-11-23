@@ -50,7 +50,7 @@ for (const [id, label] of PAGES) {
   if (!(await btn.count())) { log.push(`${label.padEnd(6)} FAIL — 导航项找不到`); continue; }
   await btn.click();
   await page.waitForTimeout(2200);
-  const main = await page.locator('main').innerText();
+  const main = await page.locator('main.content, main').first().innerText();
   const len = main.replace(/\s+/g, '').length;
   const head = main.split('\n').filter(s => s.trim())[0] || '';
   const bad = /undefined|NaN|\[object Object\]/.test(main);

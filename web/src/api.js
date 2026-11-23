@@ -33,6 +33,7 @@ import {
   buildInvoice, buildInvoices, platformMetrics, COMMERCIAL_MODEL,
 } from '../../shared/metering.js';
 import { seedDemoPlatform } from '../../shared/demo.js';
+import { seedAgroHistory } from '../../shared/agroseed.js';
 import {
   FARMER_MSG_TYPES, buildFarmerMessage, toPushPayload, WECHAT_SERVICE, nonEmptyMessages,
 } from '../../shared/farmer.js';
@@ -40,6 +41,11 @@ import {
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 const WS_BASE = (() => {
   if (import.meta.env.VITE_WS_BASE) return import.meta.env.VITE_WS_BASE;
+  // API 指向了别的源（如本地后端 8080、前端预览 4173）时，
+  // WebSocket 必须跟着 API 走，否则会连到前端自身的端口上握手失败。
+  if (API_BASE) {
+    return API_BASE.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:');
+  }
   const p = window.location.protocol;
   return `${p === 'https:' ? 'wss' : 'ws'}://${window.location.host}`;
 })();
@@ -182,6 +188,9 @@ class LocalEngine {
    */
   seedDemoTenancy() {
     seedDemoPlatform(this.store);
+    // 农情历史：冷启动即有过去 7 天的检出与作业记录，
+    // 六维统计页不需要等模拟器攒够数据才有内容。
+    seedAgroHistory(this.store, this.field, this.platform.getPlan().best);
   }
 
   onMessage(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }

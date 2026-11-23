@@ -17,6 +17,9 @@ export default function Analytics({ meta, loadDimension, detections }) {
   const [dim, setDim] = useState('spatial');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+  // 空结果重试次数：模拟器是边跑边攒数据的，
+  // 首次拉取时可能还没有检出记录，停在「0 条」会让人以为功能坏了。
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -24,6 +27,26 @@ export default function Analytics({ meta, loadDimension, detections }) {
     loadDimension(dim).then(d => { if (alive) { setData(d); setLoading(false); } });
     return () => { alive = false; };
   }, [dim, loadDimension]);
+
+  // 当前维度没有数据时，短暂等待后自动重取，直到拿到内容或重试用尽。
+  useEffect(() => {
+    if (!data) return;
+    if ((data.rows?.length || 0) > 0) return;
+    if (retry >= 12) return;               // 约 36 秒内一直无数据就放弃，避免无限轮询
+    const t = setTimeout(() => setRetry(r => r + 1), 3000);
+    return () => clearTimeout(t);
+  }, [data, retry]);
+
+  // retry 变化时重新拉取当前维度
+  useEffect(() => {
+    if (retry === 0) return;
+    let alive = true;
+    loadDimension(dim).then(d => { if (alive && d) setData(d); });
+    return () => { alive = false; };
+  }, [retry, dim, loadDimension]);
+
+  // 切换维度时重置重试计数
+  useEffect(() => { setRetry(0); }, [dim]);
 
   const dims = meta?.dimensions || [];
 
@@ -117,9 +140,20 @@ function SpatialView({ data, meta, detections }) {
   );
 }
 
+/**
+ * 检出密度 → 红色系实色。
+ *
+ * 用不透明的浅红到深红分级（不用 rgba 半透明叠加），
+ * 保证在任何底色上颜色都稳定可辨。
+ */
+function heatColor(d) {
+  const steps = ['#fbe3e1', '#f7c9c5', '#f0a8a2', '#e68078', '#d9554b', '#b42318'];
+  const i = Math.min(steps.length - 1, Math.max(0, Math.floor(d) - 1));
+  return steps[i];
+}
+
 function Heatmap({ rows, field }) {
-  if (!field) return <div className="empty">无地块信息</div>;
-  const map = new Map(rows.map(r => [`${r.row}_${r.col}`, r]));
+  if (!field) return <div className="empty">无地块信息</div>;  const map = new Map(rows.map(r => [`${r.row}_${r.col}`, r]));
   const cells = [];
   for (let r = 0; r < field.gridRows; r++) {
     for (let c = 0; c < field.gridCols; c++) {
@@ -128,8 +162,9 @@ function Heatmap({ rows, field }) {
       cells.push(
         <div key={`${r}_${c}`} title={d ? `R${r}C${c} · 检出 ${d} 处` : ''} style={{
           // 检出越密颜色越深；无检出的格子保持浅灰，与地块底色一致
-          background: d === 0 ? 'var(--panel-2)' : `rgba(220,38,38,${Math.min(0.88, 0.4 + d * 0.12)})`,
-          border: d === 0 ? '1px solid var(--border)' : '1px solid rgba(185,28,28,.25)',
+          // 用不透明实色（不用 rgba 半透明叠加）
+          background: d === 0 ? 'var(--panel-2)' : heatColor(d),
+          border: d === 0 ? '1px solid var(--border)' : '1px solid #d98c86',
         }} />
       );
     }

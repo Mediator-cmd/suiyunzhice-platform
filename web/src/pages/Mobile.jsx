@@ -425,8 +425,9 @@ export default function Mobile({ meta, missions, detections, mode }) {
         <div style={{
           position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)',
           background: toast.kind === 'ok' ? 'var(--accent)' : 'var(--warn)',
-          color: '#ffffff', padding: '12px 22px', fontSize: 14.5, fontWeight: 700,
-          zIndex: 999, boxShadow: '0 4px 18px rgba(0,0,0,.25)',
+          color: '#ffffff', padding: '12px 22px', fontSize: 15.5, fontWeight: 700,
+          borderRadius: 'var(--r)',
+          zIndex: 999, boxShadow: '0 4px 12px rgba(18, 22, 28, .18)',
         }}>
           {toast.text}
         </div>

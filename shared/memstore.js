@@ -35,6 +35,7 @@ export class MemoryStore {
       gridRows: f.gridRows, gridCols: f.gridCols,
       obstacles: f.obstacles || [],
       areaHa: f.totalAreaHa?.() ?? (f.widthM * f.heightM) / 10000,
+      lat: f.lat ?? null, lon: f.lon ?? null,
     });
   }
   listFields() { return [...this.fields.values()]; }
@@ -99,11 +100,31 @@ export class MemoryStore {
       grid: m.target?.grid || { row: null, col: null },
       disease: m.disease ?? null,
       spray: m.spray || {},
-      plan: m.plan || {},
+      // plan 里的字段必须与 SQLite 版 _missionRow 保持一致，
+      // 否则「节药率」等按分区口径的指标在纯静态部署下会算不出来。
+      plan: {
+        algo: m.plan?.algo ?? null,
+        length: m.plan?.length ?? null,
+        estMinutes: m.plan?.estMinutes ?? null,
+        estVolumeL: m.plan?.estVolumeL ?? m.plan?.estDose ?? null,
+        ecoScore: m.plan?.ecoScore ?? null,
+        savedVsUniformL: m.plan?.savedVsUniformL ?? null,
+        targetCells: m.plan?.targetCells ?? null,
+        targetClusters: m.plan?.targetClusters ?? null,
+        targetAreaHa: m.plan?.targetAreaHa ?? null,
+        targetCoverage: m.plan?.targetCoverage ?? null,
+        spillAreaHa: m.plan?.spillAreaHa ?? null,
+        zoneAreaHa: m.plan?.zoneAreaHa ?? null,
+        uniformZoneL: m.plan?.uniformZoneL ?? null,
+        savedVsZoneL: m.plan?.savedVsZoneL ?? null,
+        savedRatioVsZone: m.plan?.savedRatioVsZone ?? null,
+      },
       status: m.status ?? 'pending',
       cells: m.target?.cells ?? [],
       zoneId: m.zoneId ?? m.target?.zone ?? null,
       zoneName: m.zoneName ?? null,
+      recheckParts: m.recheckParts ?? null,
+      agent: m.agent ?? m.spray?.agent ?? null,
     };
     const i = this.missions.findIndex(x => x.missionId === rec.missionId);
     if (i >= 0) this.missions[i] = rec; else this.missions.push(rec);
