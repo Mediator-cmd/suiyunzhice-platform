@@ -339,7 +339,7 @@ function TaskView({ data }) {
               {(data.rows || []).map(r => (
                 <tr key={r.missionId}>
                   <td className="mono xs mute nowrap">{new Date(r.ts).toLocaleTimeString('zh-CN', { hour12: false })}</td>
-                  <td className="mono xs">R{r.grid.row}C{r.grid.col}</td>
+                  <td className="mono xs">{r.grid?.row != null ? `R${r.grid.row}C${r.grid.col}` : '—'}</td>
                   <td className="xs">{r.disease ? diseaseName(r.disease) : '—'}</td>
                   <td className="num">{r.speed ?? '—'}</td>
                   <td className="num">{r.flow ?? '—'}</td>

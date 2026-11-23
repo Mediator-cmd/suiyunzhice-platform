@@ -339,7 +339,7 @@ export default function Overview({ meta, devices, telemetry, detections, events,
                   <div key={e.eventId} className="ev-row">
                     <div className="row" style={{ gap: 8 }}>
                       <span className="pill warn">{(e.latency.total / 1000).toFixed(1)}s</span>
-                      <span className="xs mono mute">R{e.grid.row}C{e.grid.col}</span>
+                      <span className="xs mono mute">{e.grid?.row != null ? `R${e.grid.row}C${e.grid.col}` : '—'}</span>
                       <span className="spacer" />
                       <span className="xs mute">{new Date(e.ts).toLocaleTimeString('zh-CN')}</span>
                     </div>

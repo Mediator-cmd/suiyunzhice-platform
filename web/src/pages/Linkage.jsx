@@ -204,7 +204,7 @@ export default function Linkage({ meta, devices, detections, events, overview, c
                   {uniqEvents.map(e => (
                     <tr key={e.eventId}>
                       <td className="mono xs mute nowrap">{new Date(e.ts).toLocaleTimeString('zh-CN', { hour12: false })}</td>
-                      <td className="mono xs nowrap">R{e.grid.row}C{e.grid.col}</td>
+                      <td className="mono xs nowrap">{e.grid?.row != null ? `R${e.grid.row}C${e.grid.col}` : '—'}</td>
                       <td className="xs dim" style={{ maxWidth: 190 }}>{e.trigger.reason}</td>
                       <td>
                         {e.closed

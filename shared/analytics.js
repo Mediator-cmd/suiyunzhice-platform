@@ -164,7 +164,9 @@ export class Analytics {
     const sprayMissions = this.store.listMissionsByType
       ? this.store.listMissionsByType('spray', 5000)
       : missions.filter(m => m.type === 'spray');
-    const sprayed = new Set(sprayMissions.map(m => `${m.grid.row}_${m.grid.col}`));
+    const sprayed = new Set(sprayMissions
+      .filter(m => m.grid?.row != null)
+      .map(m => `${m.grid.row}_${m.grid.col}`));
 
     const rows = [...grid.values()].map(g => ({
       row: g.row, col: g.col,
@@ -284,10 +286,20 @@ export class Analytics {
   /** 作业维度：任务效率 */
   task(missions) {
     const sprays = missions.filter(m => m.type === 'spray');
+    if (typeof process !== 'undefined' && process.env?.DEBUG_TASK) {
+      console.log('[task] sprays=', sprays.length);
+      for (const m of sprays) {
+        if (!m.grid) console.log('[task] NO GRID:', JSON.stringify(m));
+      }
+    }
     const rows = sprays.map(m => ({
       missionId: m.missionId,
       ts: m.createdAt,
-      grid: m.grid,
+      // 网格必须始终是对象：作业单的网格可能为空（整区作业 / 计量补录的
+      // 历史单没有 target.grid），前端表格按 R{row}C{col} 渲染，
+      // 缺字段会让整页崩掉。空网格统一成 {row:null,col:null}，
+      // 页面按「—」显示，而不是抛异常。
+      grid: m.grid ?? { row: null, col: null },
       disease: m.disease,
       speed: m.spray?.speed,
       flow: m.spray?.flow,

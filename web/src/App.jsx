@@ -344,7 +344,6 @@ export default function App() {
     <div className="app">
       <aside className="sidebar">
         <div className="brand">
-          <span className="mark">穗</span>
           <span className="brand-text">
             <b>{BRAND}</b>
             <i>{BRAND_FULL}</i>
