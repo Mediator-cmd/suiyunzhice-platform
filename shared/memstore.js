@@ -149,6 +149,10 @@ export class MemoryStore {
       trigger: e.trigger, chain: e.chain, grid: e.grid,
       disease: e.disease ?? null, latency: e.latency, closed: e.closed,
       mission: e.mission ?? null,
+      // 未闭环的原因与地面复核证据 —— 与 SQLite 版保持一致，
+      // 否则「空地联动」页在纯静态部署下看不到待闭环说明与复核证据。
+      pendingReason: e.pendingReason ?? null,
+      groundEvidence: e.groundEvidence ?? null,
     };
     const i = this.linkEvents.findIndex(x => x.eventId === rec.eventId);
     if (i >= 0) this.linkEvents[i] = rec; else this.linkEvents.push(rec);
