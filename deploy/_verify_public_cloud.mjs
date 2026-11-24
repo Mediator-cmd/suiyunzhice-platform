@@ -13,11 +13,29 @@
 
 import { chromium } from 'playwright-core';
 
-const URL = process.argv[2] || 'https://suiyunzhice-platform.<你的子域名>.workers.dev';
+const URL = process.argv[2] || 'https://suiyunzhice-platform.3403775603.workers.dev';
 const EXE = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 
-const api = async (p) => {
-  const res = await fetch(`${URL}/api${p}`, { signal: AbortSignal.timeout(20000) });
+/**
+ * 后端地址。
+ *
+ * 同源部署（Cloudflare Worker）下 /api 就在本站；
+ * 纯静态托管（GitHub Pages）下前端会把 API 请求发到云端 Worker。
+ * 两种都试，取先成功的那个 —— 否则验收脚本会把跨源部署误判为失败。
+ */
+const CLOUD_API = 'https://suiyunzhice-platform.3403775603.workers.dev/api';
+
+let api = null;
+for (const base of [`${URL}/api`, CLOUD_API]) {
+  try {
+    const res = await fetch(`${base}/meta`, { signal: AbortSignal.timeout(15000) });
+    if (res.ok) { api = base; break; }
+  } catch { /* 试下一个 */ }
+}
+
+const call = async (p) => {
+  if (!api) return { status: 0, body: {} };
+  const res = await fetch(`${api}${p}`, { signal: AbortSignal.timeout(20000) });
   const text = await res.text();
   let body;
   try { body = JSON.parse(text); } catch { body = text; }
@@ -25,7 +43,12 @@ const api = async (p) => {
 };
 
 async function main() {
-  console.log(`验收目标：${URL}\n`);
+  console.log(`验收目标：${URL}`);
+  console.log(`后端地址：${api || '（不可达）'}\n`);
+  if (!api) {
+    console.log('✗ 找不到可用的后端地址');
+    process.exit(1);
+  }
 
   let fail = 0;
   const check = (ok, label, detail = '') => {
@@ -36,7 +59,7 @@ async function main() {
   // ---- 1. 后端接口 ----
   console.log('--- 后端接口 ---');
   try {
-    const meta = await api('/meta');
+    const meta = await call('/meta');
     check(meta.status === 200, '/api/meta 可达', `status=${meta.status}`);
     if (meta.body?.field) {
       check(true, '地块信息', `${meta.body.field.name}`);
@@ -48,7 +71,7 @@ async function main() {
   const dims = ['spatial', 'temporal', 'disease', 'platform', 'task', 'environment'];
   for (const d of dims) {
     try {
-      const r = await api(`/analytics/${d}`);
+      const r = await call(`/analytics/${d}`);
       const rows = r.body?.rows?.length ?? 0;
       check(r.status === 200 && rows > 0, `六维 /${d}`, `rows=${rows}`);
     } catch (e) {
@@ -57,7 +80,7 @@ async function main() {
   }
 
   try {
-    const ov = await api('/analytics/overview');
+    const ov = await call('/analytics/overview');
     const eff = ov.body?.efficiency || {};
     check(typeof eff.savedRatioVsZone === 'number', '分区口径节药率', `${eff.savedRatioVsZone}%`);
     check(typeof eff.savedRatio === 'number', '全田口径节药率', `${eff.savedRatio}%`);
@@ -66,7 +89,7 @@ async function main() {
   }
 
   try {
-    const ev = await api('/linkage/events?limit=20');
+    const ev = await call('/linkage/events?limit=20');
     const st = ev.body?.stats || {};
     check(st.count > 0, '联动事件', `count=${st.count} closed=${st.closedRatio}%`);
   } catch (e) {
@@ -75,7 +98,9 @@ async function main() {
 
   // ---- 2. WebSocket ----
   console.log('\n--- WebSocket 实时通道 ---');
-  const wsUrl = URL.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:') + '/ws/live';
+  // WebSocket 连到后端所在的源（跨源部署时与页面不同源）
+  const backendOrigin = api.replace(/\/api$/, '');
+  const wsUrl = backendOrigin.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:') + '/ws/live';
   const wsResult = await new Promise((resolve) => {
     let ws;
     const timer = setTimeout(() => { try { ws?.close(); } catch { /* */ } resolve({ ok: false, reason: '超时' }); }, 15000);
