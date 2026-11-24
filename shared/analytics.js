@@ -286,12 +286,6 @@ export class Analytics {
   /** 作业维度：任务效率 */
   task(missions) {
     const sprays = missions.filter(m => m.type === 'spray');
-    if (typeof process !== 'undefined' && process.env?.DEBUG_TASK) {
-      console.log('[task] sprays=', sprays.length);
-      for (const m of sprays) {
-        if (!m.grid) console.log('[task] NO GRID:', JSON.stringify(m));
-      }
-    }
     const rows = sprays.map(m => ({
       missionId: m.missionId,
       ts: m.createdAt,

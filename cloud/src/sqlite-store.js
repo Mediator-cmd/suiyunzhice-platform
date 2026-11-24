@@ -35,10 +35,20 @@ export class SqliteStore {
     return cur.toArray();
   }
 
-  /** 执行一条查询，返回第一行或 null */
+  /**
+   * 执行一条查询，返回第一行或 null。
+   *
+   * 注意语义差异：DO 的 cursor.one() 在没有结果时会**抛异常**
+   * （"Expected exactly one result from SQL query, but got no results."），
+   * 而 node:sqlite 的 get() 返回 undefined。
+   * 这里统一成 node:sqlite 的语义（查不到返回 null），
+   * 否则 getDeviceAccess 这类「查不到就返回 null」的调用在云端会崩。
+   * 用 toArray()[0] 而不是 one()，正是为了避开这个抛异常行为。
+   */
   get(query, ...params) {
     const cur = this.sql.exec(query, ...params);
-    return cur.one();
+    const rows = cur.toArray();
+    return rows.length ? rows[0] : null;
   }
 
   /** 执行写入语句 */

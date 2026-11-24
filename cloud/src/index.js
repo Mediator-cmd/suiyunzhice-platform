@@ -30,8 +30,6 @@ import { LinkageEngine } from '../../shared/linkage.js';
 import { seedDemoPlatform } from '../../shared/demo.js';
 import { seedAgroHistory } from '../../shared/agroseed.js';
 
-export { PlatformState } from './platform-state.js';
-
 export default {
   /**
    * HTTP 入口。
@@ -39,6 +37,23 @@ export default {
    * 非 /api 路径交给静态资源（Pages/Workers Assets）。
    */
   async fetch(request, env, ctx) {
+    try {
+      return await this.handleFetch(request, env, ctx);
+    } catch (e) {
+      // 出错时把堆栈写进响应体，方便在没有 tail 通道的环境里排查
+      console.error('[worker]', e?.stack || e?.message || e);
+      return new Response(JSON.stringify({
+        error: '服务端异常',
+        message: String(e?.message || e),
+        stack: String(e?.stack || '').split('\n').slice(0, 6),
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      });
+    }
+  },
+
+  async handleFetch(request, env, ctx) {
     const url = new URL(request.url);
 
     // 设备遥测 WebSocket：/ws/telemetry 与 /ws/live 都由 Durable Object 承载
@@ -55,7 +70,7 @@ export default {
     // 非 API 路径：交给静态资源绑定
     if (env.ASSETS) return env.ASSETS.fetch(request);
     return new Response('Not Found', { status: 404 });
-  },
+  }
 };
 
 /* ================================================================
@@ -63,6 +78,9 @@ export default {
  * ================================================================ */
 
 export class PlatformState {
+  /** 自动派工的节流时间戳（上次派工时刻） */
+  lastSprayDispatch = 0;
+
   constructor(state, env) {
     this.state = state;
     this.env = env;
@@ -117,7 +135,7 @@ export class PlatformState {
   }
 
   /** 检测结果处理：联动闭环 + 派单 */
-  onDetection(d) {
+  async onDetection(d) {
     this.broadcast('detection', d);
     if (d.kind === 'robot') {
       const closedEv = this.linkage.completeCycle(d);
@@ -131,33 +149,16 @@ export class PlatformState {
         field: this.platform.field, planning: plan,
       });
       this.broadcast('linkage', ev);
-      const mission = this.buildRecheckMission(d);
+      const mission = await this.buildRecheckMission(d);
       this.store.insertMission(mission);
       this.broadcast('mission', mission);
     }
-    this.dispatchSprayIfNeeded();
+    await this.dispatchSprayIfNeeded();
   }
 
   async buildRecheckMission(d) {
     const { buildRecheckMission } = await import('../../shared/spraydispatch.js');
     return buildRecheckMission({ detection: d, field: this.platform.field });
-  }
-
-  lastSprayDispatch = 0;
-  dispatchSprayIfNeeded() {
-    const now = Date.now();
-    if (now - this.lastSprayDispatch < 8000) return;
-    this.lastSprayDispatch = now;
-    try {
-      const built = this.buildSprayMissions();
-      for (const b of built) {
-        this.store.insertMission(b.mission);
-        this.broadcast('mission', b.mission);
-        this.broadcast('sprayPlan', { mission: b.mission, ratio: b.ratio });
-      }
-    } catch (e) {
-      console.error('[spray-dispatch]', e.message);
-    }
   }
 
   async buildSprayMissions() {
@@ -168,6 +169,26 @@ export class PlatformState {
       missions: this.store.listMissionsByType('spray', 5000),
       plan: this.platform.getPlan().best,
     });
+  }
+
+  /**
+   * 自动派工：确诊病害累积到阈值后生成靶向施药作业单。
+   * 与本机版共用 shared/spraydispatch.js，保证两端口径一致。
+   */
+  async dispatchSprayIfNeeded() {
+    const now = Date.now();
+    if (now - this.lastSprayDispatch < 8000) return;   // 节流，避免刷屏
+    this.lastSprayDispatch = now;
+    try {
+      const built = await this.buildSprayMissions();
+      for (const b of built) {
+        this.store.insertMission(b.mission);
+        this.broadcast('mission', b.mission);
+        this.broadcast('sprayPlan', { mission: b.mission, ratio: b.ratio });
+      }
+    } catch (e) {
+      console.error('[spray-dispatch]', e.message);
+    }
   }
 
   /** 统一广播：推给所有订阅者 */
@@ -183,6 +204,22 @@ export class PlatformState {
   }
 
   async fetch(request) {
+    try {
+      return await this.handleFetch(request);
+    } catch (e) {
+      console.error('[do]', e?.stack || e?.message || e);
+      return new Response(JSON.stringify({
+        error: '服务端异常',
+        message: String(e?.message || e),
+        stack: String(e?.stack || '').split('\n').slice(0, 8),
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      });
+    }
+  }
+
+  async handleFetch(request) {
     await this.ensureInit();
     const url = new URL(request.url);
 
