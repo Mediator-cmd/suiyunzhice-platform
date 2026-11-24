@@ -38,10 +38,27 @@ import {
   FARMER_MSG_TYPES, buildFarmerMessage, toPushPayload, WECHAT_SERVICE, nonEmptyMessages,
 } from '../../shared/farmer.js';
 
-const API_BASE = import.meta.env.VITE_API_BASE || '';
+/**
+ * 云端后端地址。
+ *
+ * 纯静态托管（GitHub Pages）与平台同源部署都能用：
+ *   · 同源部署（Cloudflare Worker）—— 直接用当前站点的 /api
+ *   · GitHub Pages —— 指向云端 Worker
+ * 后端不可达时前端会退回浏览器内引擎，功能依然完整。
+ */
+const CLOUD_API_BASE = 'https://suiyunzhice-platform.3403775603.workers.dev';
+
+const API_BASE = (() => {
+  if (import.meta.env.VITE_API_BASE) return import.meta.env.VITE_API_BASE;
+  // GitHub Pages 等纯静态托管没有 /api，改为指向云端后端
+  const h = window.location.hostname;
+  if (h.endsWith('.github.io') || h.endsWith('.github.dev')) return CLOUD_API_BASE;
+  return '';
+})();
+
 const WS_BASE = (() => {
   if (import.meta.env.VITE_WS_BASE) return import.meta.env.VITE_WS_BASE;
-  // API 指向了别的源（如本地后端 8080、前端预览 4173）时，
+  // API 指向了别的源（如云端后端、本地后端 8080）时，
   // WebSocket 必须跟着 API 走，否则会连到前端自身的端口上握手失败。
   if (API_BASE) {
     return API_BASE.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:');
@@ -71,19 +88,13 @@ async function get(path) {
 let backendState = null;      // null=未探测, true=可用, false=不可用
 let backendProbe = null;      // 进行中的探测 promise
 
-function isKnownStaticHost() {
-  const h = window.location.hostname;
-  return h.endsWith('.github.io') || h.endsWith('.github.dev');
-}
-
 async function probeBackend() {
   if (backendState !== null) return backendState;
-  if (isKnownStaticHost()) { backendState = false; return false; }
   if (!backendProbe) {
     backendProbe = (async () => {
       try {
         const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 2500);
+        const timer = setTimeout(() => ctrl.abort(), 4000);
         const res = await fetch(`${API_BASE}/api/meta`, { signal: ctrl.signal });
         clearTimeout(timer);
         backendState = res.ok;

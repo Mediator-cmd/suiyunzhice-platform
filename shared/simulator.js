@@ -46,7 +46,17 @@ export class Simulator {
     this.pendingRechecks = [];
   }
 
-  start(intervalMs = 200) {
+  /**
+   * 启动模拟器。
+   *
+   * @param {number} intervalMs 定时器间隔
+   * @param {object} opts
+   * @param {boolean} opts.manual 手动模式：不起定时器，改由外部调用 tick()。
+   *        云端（Durable Object）必须用手动模式 —— Worker 里 setInterval
+   *        不可靠（对象被驱逐就停），要用持久化的 alarm 驱动。
+   * @param {object} opts.state 初始状态（用于从持久化存储恢复）
+   */
+  start(intervalMs = 200, opts = {}) {
     // 注册设备到设备表
     this.onDevice({
       deviceId: this.uav.deviceId, kind: 'uav', name: this.uav.name,
@@ -58,10 +68,27 @@ export class Simulator {
       state: this.robot.state, pos: { x: this.robot.x, y: this.robot.y, z: this.robot.z },
       batt: this.robot.batt, coverage: this.robot.coverage, lastSeen: Date.now(), online: true,
     });
-    this.timer = setInterval(() => this.tick(), intervalMs);
+    // 恢复上次的位置与电量（云端对象被驱逐后设备不该瞬移回起点）
+    if (opts.state) {
+      Object.assign(this.uav, opts.state.uav || {});
+      Object.assign(this.robot, opts.state.robot || {});
+      this.seq = { ...this.seq, ...(opts.state.seq || {}) };
+    }
+    if (!opts.manual) {
+      this.timer = setInterval(() => this.tick(), intervalMs);
+    }
     return this;
   }
   stop() { if (this.timer) clearInterval(this.timer); }
+
+  /** 导出可持久化的状态（云端对象被驱逐后据此恢复） */
+  snapshot() {
+    return {
+      uav: { ...this.uav },
+      robot: { ...this.robot },
+      seq: { ...this.seq },
+    };
+  }
 
   tick() {
     const dt = 0.2; // 与 intervalMs 一致

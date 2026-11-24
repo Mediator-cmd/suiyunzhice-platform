@@ -196,6 +196,20 @@ export class SqliteStore {
       nz(t.pos?.spd), nz(t.pos?.hdg), nz(t.batt),
       nz(latency), JSON.stringify(t.payload || {}));
   }
+  /**
+   * 裁剪过期的遥测数据。
+   *
+   * 遥测是高频表（2 台设备 × 1 Hz ≈ 每天 17 万行），
+   * 不裁剪会持续占用存储，最终撞上免费额度。
+   * 平台上真正用到的只有「最近一小时」——
+   * 实时监控看曲线、链路质量看 P95 与丢包率，都用不到更早的数据。
+   *
+   * 本机版没有这个方法：本地 SQLite 文件不存在免费额度问题。
+   */
+  pruneTelemetry(keepMs) {
+    const cutoff = Date.now() - keepMs;
+    this.run(`DELETE FROM telemetry WHERE ts < ?`, cutoff);
+  }
   recentTelemetry(limit = 200, deviceId = null) {
     // 与 server/src/store.js 同一条 SQL：取最近 N 条、按时间正序返回，
     // 并用 id 做第二排序键，避免同刻多帧的顺序在两端不一致。

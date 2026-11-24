@@ -70,4 +70,29 @@ export class LinkStats {
     }
     return out.sort((a, b) => a.deviceId.localeCompare(b.deviceId));
   }
+
+  /**
+   * 导出可持久化的状态。
+   *
+   * 云端（Durable Object）的内存态会随对象被驱逐而丢失，
+   * 而「实时监控」页的链路质量面板依赖这些计数。
+   * 用这个方法把统计项存进 KV，随对象状态一起持久化。
+   */
+  snapshot() {
+    return {
+      deviceStats: [...this.deviceStats.values()].map(st => ({
+        ...st,
+        // latSamples 只留最近 50 个，持久化体积可控
+        latSamples: st.latSamples.slice(-50),
+      })),
+    };
+  }
+
+  /** 从持久化状态恢复（与 snapshot 配对使用） */
+  restore(snap) {
+    if (!snap?.deviceStats) return;
+    this.deviceStats = new Map(
+      snap.deviceStats.map(st => [st.deviceId, { ...st, latSamples: [...(st.latSamples || [])] }]),
+    );
+  }
 }

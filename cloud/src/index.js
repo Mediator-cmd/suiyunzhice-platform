@@ -30,6 +30,9 @@ import { LinkageEngine } from '../../shared/linkage.js';
 import { seedDemoPlatform } from '../../shared/demo.js';
 import { seedAgroHistory } from '../../shared/agroseed.js';
 
+/** 遥测保留时长：1 小时。平台上用不到更早的遥测。 */
+const TELEMETRY_KEEP_MS = 60 * 60 * 1000;
+
 export default {
   /**
    * HTTP 入口。
@@ -80,6 +83,8 @@ export default {
 export class PlatformState {
   /** 自动派工的节流时间戳（上次派工时刻） */
   lastSprayDispatch = 0;
+  /** 内置模拟器（云端有真实后端，就该有设备在跑） */
+  sim = null;
 
   constructor(state, env) {
     this.state = state;
@@ -113,6 +118,11 @@ export class PlatformState {
     this.platform = new Platform({ store: this.store, field: defaultField() });
     this.analytics = new Analytics(this.store, this.platform.field);
     this.stats = new LinkStats();
+    // 恢复链路统计：Durable Object 被驱逐后内存态会清空，
+    // 而「实时监控」页的链路质量面板依赖这些计数。
+    // 遥测数据本身存在 SQLite 里，统计项则随 KV 一起持久化。
+    const statsSnap = await this.state.storage.get('linkStats');
+    if (statsSnap) this.stats.restore(statsSnap);
     this.linkage = new LinkageEngine({
       store: this.store,
       onEvent: (e) => this.broadcast('linkage', e),
@@ -128,10 +138,93 @@ export class PlatformState {
     });
 
     // 演示数据与农情历史（与本机版共用同一份 shared/ 代码）
-    seedDemoPlatform(this.store, { skipTenants: this.store.listTenants().length > 0 });
-    seedAgroHistory(this.store, this.platform.field, this.platform.getPlan().best);
+    //
+    // 只播种一次：Durable Object 被驱逐后重新唤醒时会再走一遍初始化，
+    // 若重复播种，历史记录的时间戳会被重置成「现在」，
+    // 七天的农情历史就失真了。用一个持久化标记保证只播一次。
+    const seeded = await this.state.storage.get('seeded');
+    if (!seeded) {
+      seedDemoPlatform(this.store, { skipTenants: this.store.listTenants().length > 0 });
+      seedAgroHistory(this.store, this.platform.field, this.platform.getPlan().best);
+      await this.state.storage.put('seeded', Date.now());
+    }
 
     this.ready = true;
+
+    // 启动内置模拟器：让云端真的有设备在跑
+    // （有真实后端却空空如也，比静态版还"空"，这正是要避免的）
+    await this.startSimulator();
+  }
+
+  /**
+   * 启动内置数据模拟器。
+   *
+   * 用 Durable Object 的 alarm 而不是 setInterval：
+   *   setInterval 在 Worker 里不可靠（对象被驱逐就停，且不保证触发）；
+   *   alarm 是持久化的 —— 对象即使被驱逐出内存，到点也会被唤醒继续跑。
+   *
+   * 频率取 1 秒一次：模拟器内部按 dt=0.2s 的步长推进，
+   * 5Hz 的遥测在云端意义不大（每秒 2 帧足以展示实时性），
+   * 而 1 秒一次能把 DO 的调用量压在免费额度内。
+   */
+  async startSimulator() {
+    if (this.env.SIM === '0') return;      // 生产环境可关掉
+    if (this.sim) return;
+    const { Simulator } = await import('../../shared/simulator.js');
+    // 恢复上次的位置状态：对象被驱逐后设备不该瞬移回起点
+    const saved = await this.state.storage.get('simState');
+    this.sim = new Simulator({
+      field: this.platform.field,
+      onDevice: (d) => { this.store.upsertDevice(d); },
+      onTelemetry: (t, latency) => {
+        this.store.insertTelemetry(t, latency);
+        // 模拟器不经 WebSocket，需显式登记链路质量，否则「实时监控」页无指标
+        this.hub.recordTelemetry(t.deviceId, t.kind, latency, t.seq, t.state);
+        this.broadcast('telemetry', { ...t, latencyMs: latency });
+      },
+      onDetection: (d) => { this.onDetection(d); },
+    });
+    // 手动模式：不用 setInterval，由 alarm 驱动 tick()
+    this.sim.start(1000, { manual: true, state: saved });
+    // 立刻排一次 alarm，并让它每 1 秒再触发
+    const existing = await this.state.storage.getAlarm();
+    if (!existing) await this.state.storage.setAlarm(Date.now() + 1000);
+  }
+
+  /**
+   * alarm 回调：推进模拟器并排下一次。
+   * 这是云端持续产生真实数据的心跳。
+   */
+  async alarm() {
+    await this.ensureInit();
+    try {
+      if (this.sim) {
+        this.sim.tick();
+        // 每 10 次存一次状态：位置变化是连续的，存太频繁没意义
+        this.simTickCount = (this.simTickCount || 0) + 1;
+        if (this.simTickCount % 10 === 0) {
+          await this.state.storage.put('simState', this.sim.snapshot());
+        }
+      }
+      // 定期裁剪遥测表。
+      //
+      // 遥测是高频数据（2 台设备 × 1 Hz = 每天 17 万行），
+      // 不裁剪的话存储会一直涨，最终撞上免费额度。
+      // 平台上真正用到的遥测只有「最近一小时」——
+      // 实时监控看曲线、链路质量看 P95/丢包率，都用不到更早的数据。
+      this.pruneTick = (this.pruneTick || 0) + 1;
+      if (this.pruneTick % 60 === 0) {
+        this.store.pruneTelemetry(TELEMETRY_KEEP_MS);
+      }
+      // 链路统计是内存态，持久化后对象被驱逐也不丢
+      if (this.pruneTick % 5 === 0) {
+        await this.state.storage.put('linkStats', this.stats.snapshot());
+      }
+    } catch (e) {
+      console.error('[sim]', e?.message || e);
+    }
+    // 排下一次
+    await this.state.storage.setAlarm(Date.now() + 1000);
   }
 
   /** 检测结果处理：联动闭环 + 派单 */
