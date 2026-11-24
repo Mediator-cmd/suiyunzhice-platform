@@ -12,16 +12,24 @@
  */
 
 import { DISEASES, DEVICE_STATES } from './schema.js';
+import { FleetExecutor } from './fleet-executor.js';
 
 export class Simulator {
-  constructor({ field, onTelemetry, onDetection, onDevice, dt = 0.2, detectChance = null }) {
+  constructor({ field, onTelemetry, onDetection, onDevice, dt = 0.2, detectChance = null,
+    onCommand, onMission, onUsage }) {
     this.field = field;
     this.onTelemetry = onTelemetry || (() => {});
     this.onDetection = onDetection || (() => {});
     this.onDevice = onDevice || (() => {});
+    /** 受控执行层的回调（指令回执 / 作业单 / 用量） */
+    this.onCommand = onCommand || (() => {});
+    this.onMission = onMission || (() => {});
+    this.onUsage = onUsage || (() => {});
     this.timer = null;
     this.seq = { 'UAV-01': 0, 'ROB-01': 0 };
     this.detSeq = 0;
+    /** 外部接管标记：平台下发了受控作业指令时，暂停自主巡逻 */
+    this.manualControl = false;
 
     /**
      * 每拍推进的模拟时长（秒）。
@@ -45,6 +53,18 @@ export class Simulator {
     this.detectChance = detectChance ?? (0.16 * (dt / 0.2));
     /** 电量消耗按 dt 缩放，保持「每小时耗电多少」与真实一致。 */
     this.k = dt / 0.2;
+    /**
+     * 受控执行的加速档位（1 = 实时）。
+     *
+     * 一趟靶向点喷要飞十几分钟，评审现场不能干等。
+     * 加速是把「仿真时间」一次推进多个固定子步，
+     * 电量、药耗、里程仍按真实经过的仿真时间计算 ——
+     * 加速的是墙钟等待，不是物理量。
+     *
+     * 只作用于受控执行：自主巡逻的检出与遥测密度保持不变，
+     * 否则云端 Durable Object 的免费额度会被打爆。
+     */
+    this.execSpeedFactor = 1;
 
     // 病害分布：几个病灶中心
     this.hotspots = [
@@ -67,6 +87,53 @@ export class Simulator {
       target: null, coverage: 0,
     };
     this.pendingRechecks = [];
+
+    /* ================================================================
+     * 受控执行层 —— 平台下发指令时由它驱动设备
+     *
+     * 与自主巡逻并存，不是二选一：
+     *   · 没有指令时，设备按固定路线自主巡田（发现病灶、触发复核）
+     *   · 平台下了作业指令，执行器接管对应设备，按平台给的航线执行
+     *
+     * 关键：执行器与自主逻辑**共用同一份设备状态与遥测序号**
+     * （this.shared.dev / this.shared.seq），
+     * 否则一台设备会同时发两路遥测、序号重号，
+     * 链路的丢包率统计会把重号当成丢帧。
+     * ================================================================ */
+    this.shared = {
+      'UAV-01': { dev: this.uav, seq: 0 },
+      'ROB-01': { dev: this.robot, seq: 0 },
+    };
+    this.executors = {};
+  }
+
+  /** 取（或建）某台设备的执行器 */
+  executorFor(deviceId) {
+    if (this.executors[deviceId]) return this.executors[deviceId];
+    const kind = deviceId.startsWith('UAV') ? 'uav' : 'robot';
+    const dev = this.shared[deviceId]?.dev
+      || (kind === 'uav' ? this.uav : this.robot);
+    this.shared[deviceId] = { dev, seq: this.shared[deviceId]?.seq || 0 };
+    const ex = new FleetExecutor({
+      field: this.field,
+      deviceId,
+      deviceKind: kind,
+      shared: this.shared[deviceId],
+      // 受控执行期间的遥测也必须同步设备表 ——
+      // 否则作业过程中 /fleet/status 拿到的还是作业前的旧位置，
+      // 地图上的设备图标在无人机飞行时不会跟着动。
+      onTelemetry: (t) => {
+        this.onTelemetry(t, 20 + Math.random() * 60);
+        const d = this.shared[deviceId]?.dev;
+        if (d) this.syncDevice(d);
+      },
+      onDetection: (d) => this.onDetection(d),
+      onCommand: (c) => this.onCommand(c),
+      onMission: (m) => this.onMission(m),
+      onUsage: (u) => this.onUsage(u),
+    });
+    this.executors[deviceId] = ex;
+    return ex;
   }
 
   /**
@@ -104,19 +171,77 @@ export class Simulator {
   }
   stop() { if (this.timer) clearInterval(this.timer); }
 
-  /** 导出可持久化的状态（云端对象被驱逐后据此恢复） */
+  /**
+   * 接收平台下发的指令。
+   *
+   * 这是「平台能操控设备」的落点：指令进来 → 设备真的动起来。
+   *
+   * @param {object} cmd  { commandId, deviceId, type, payload, missionId }
+   * @param {object} [plan] 作业方式指令需要先算好航线
+   * @returns {{ok:boolean, reason?:string}}
+   */
+  receiveCommand(cmd, plan = null) {
+    const ex = this.executorFor(cmd.deviceId);
+    const r = ex.receive(cmd);
+    // 作业方式指令：宿主已算好作业计划，这里才真正开始执行
+    if (r.needsPlan && plan) {
+      const started = ex.startOperation(cmd, plan);
+      return { ok: true, command: started.command };
+    }
+    return r;
+  }
+
+  /** 导出可持久化状态（含执行层） */
   snapshot() {
+    const execs = {};
+    for (const [id, ex] of Object.entries(this.executors)) {
+      execs[id] = ex.snapshot();
+    }
     return {
       uav: { ...this.uav },
       robot: { ...this.robot },
       seq: { ...this.seq },
+      execs,
     };
   }
 
+  /**
+   * 设置受控执行的加速档位。
+   *
+   * @param {number} factor 1 = 实时，10 / 60 / 300 = 加速
+   * @returns {{ok:boolean, factor?:number, reason?:string}}
+   */
+  setExecSpeed(factor) {
+    const f = Number(factor);
+    if (!Number.isFinite(f) || f < 1 || f > 600) {
+      return { ok: false, reason: '加速档位需在 1~600 之间' };
+    }
+    this.execSpeedFactor = f;
+    return { ok: true, factor: f };
+  }
+
+  /**
+   * 推进一拍。
+   */
   tick() {
     const dt = this.dt; // 构造时指定，云端用 1s，本机用 0.2s
-    try { this.stepUav(dt); } catch (e) { logErr('stepUav', e); }
-    try { this.stepRobot(dt); } catch (e) { logErr('stepRobot', e); }
+    // 受控执行优先：平台下了作业指令的设备由执行器驱动，
+    // 自主巡逻只跑在「空闲」设备上，避免两个逻辑抢同一台设备的位置。
+    //
+    // 执行器只在「手上有指令」时才推进 —— 否则它会与自主逻辑各发一帧遥测，
+    // 设备同一时刻出现两个位置，地图上的图标会来回跳。
+    const uavEx = this.executors['UAV-01'];
+    const robEx = this.executors['ROB-01'];
+    const uavBusy = uavEx?.order != null;
+    const robBusy = robEx?.order != null;
+    try { if (!uavBusy) this.stepUav(dt); } catch (e) { logErr('stepUav', e); }
+    try { if (!robBusy) this.stepRobot(dt); } catch (e) { logErr('stepRobot', e); }
+    // 受控执行按加速档位推进：加速的是墙钟等待，物理量仍按仿真时间计
+    const sub = this.execSpeedFactor > 1
+      ? Math.round((dt * this.execSpeedFactor) / 0.2)
+      : 1;
+    try { if (uavBusy) uavEx.tick(dt, { subSteps: sub }); } catch (e) { logErr('execUav', e); }
+    try { if (robBusy) robEx.tick(dt, { subSteps: sub }); } catch (e) { logErr('execRob', e); }
   }
 
   stepUav(dt) {
@@ -191,11 +316,16 @@ export class Simulator {
 
   emitTelemetry(d) {
     const ts = Date.now();
-    this.seq[d.deviceId] = (this.seq[d.deviceId] || 0) + 1;
+    // 序号统一由 shared.seq 分配：自主巡逻与受控执行共用同一条序列，
+    // 否则两路遥测各自从 1 开始，链路统计会把重号当成丢帧。
+    const sh = this.shared[d.deviceId] || (this.shared[d.deviceId] = { dev: d, seq: 0 });
+    sh.seq = (sh.seq || 0) + 1;
+    this.seq[d.deviceId] = sh.seq;
+    const seq = sh.seq;
     this.onTelemetry({
-      frameId: `F-${d.deviceId}-${this.seq[d.deviceId]}`,
+      frameId: `F-${d.deviceId}-${seq}`,
       ts,
-      seq: this.seq[d.deviceId],
+      seq,
       deviceId: d.deviceId,
       kind: d.deviceId.startsWith('UAV') ? 'uav' : 'robot',
       name: d.name,

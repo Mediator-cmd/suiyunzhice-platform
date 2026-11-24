@@ -38,6 +38,11 @@ import { seedAgroHistory } from '../../shared/agroseed.js';
 import {
   FARMER_MSG_TYPES, buildFarmerMessage, toPushPayload, WECHAT_SERVICE, nonEmptyMessages,
 } from '../../shared/farmer.js';
+import {
+  OPERATION_MODES, DIRECT_COMMANDS, COMMAND_TYPES,
+  buildOperationPlan, cellsInArea, confirmedCellsInArea,
+  operationMode, directCommand, validateCommand,
+} from '../../shared/fleet.js';
 
 /**
  * 云端后端地址。
@@ -161,6 +166,35 @@ class LocalEngine {
         }
         // 确诊结果累积到一定密度 → 自动生成靶向施药作业单（省药闭环）
         this.maybeDispatchSpray();
+      },
+      /* ---- 受控执行层回调 ---- */
+      onCommand: (c) => {
+        this.store.insertCommand(c);
+        this.emit('commandStatus', c);
+      },
+      onMission: (m) => {
+        if (m.plan || m.target) {
+          this.store.insertMission(m);
+          this.emit('mission', m);
+        } else {
+          this.store.updateMissionStatus(m.missionId, m.status);
+          this.emit('missionStatus', { missionId: m.missionId, status: m.status });
+        }
+      },
+      onUsage: (u) => {
+        this.store.insertUsage({
+          ts: Date.now(),
+          tenantId: DEMO_IDENTITY.tenantId,
+          missionId: u.missionId || null,
+          type: u.type || 'spray',
+          areaMu: u.areaMu ?? null,
+          volumeL: u.volumeL ?? null,
+          minutes: u.minutes ?? null,
+          sorties: 1,
+          detections: u.detections ?? 0,
+          savedL: u.savedL ?? null,
+          amount: null,
+        });
       },
     });
     this.sim.start();
@@ -508,6 +542,168 @@ class LocalEngine {
       samples: ['node', 'python', 'ws'],
     };
   }
+
+  /* ================================================================
+   * 装备操控 —— 与服务端 /fleet/* 三条路由一一对应
+   *
+   * 走的是同一套 shared/fleet.js 逻辑，因此纯静态部署下
+   * 「预览的航线」与「真的执行的航线」完全一致。
+   * ================================================================ */
+
+  /** 作业方式与直接指令目录 */
+  fleetModes() {
+    return { modes: OPERATION_MODES, directCommands: DIRECT_COMMANDS, types: COMMAND_TYPES };
+  }
+
+  /** 作业范围预览（只算不下发） */
+  fleetPlan(body) {
+    const b = body || {};
+    const dets = b.modeId === 'spray_target' ? this.store.listDetections(2000) : [];
+    const built = buildOperationPlan({
+      field: this.field,
+      modeId: b.modeId,
+      detections: dets,
+      area: b.area || null,
+      zoneId: b.zoneId || null,
+      disease: b.disease || null,
+      agent: b.agent || null,
+      speedMs: Number(b.speedMs || 6),
+      swathM: b.swathM != null ? Number(b.swathM) : null,
+      doseLha: b.doseLha != null ? Number(b.doseLha) : null,
+      headingDeg: Number(b.headingDeg || 90),
+      deviceId: b.deviceId || null,
+    });
+    if (!built.ok) return { error: built.reason };
+    const plan = built.plan;
+    return {
+      mode: plan.mode,
+      path: plan.path.slice(0, 6000),
+      pathTotal: plan.path.length,
+      targetCells: plan.targetCells,
+      spray: plan.spray,
+      summary: plan.summary,
+      ratio: plan.ratio ? {
+        requiredFlowLmin: plan.ratio.requiredFlowLmin,
+        dutyCycle: plan.ratio.dutyCycle,
+        flowPerSpeed: plan.ratio.flowPerSpeed,
+        speedRange: plan.ratio.speedRange,
+        feasible: plan.ratio.feasible,
+        totalVolumeL: plan.ratio.totalVolumeL,
+      } : null,
+      mission: plan.mission,
+    };
+  }
+
+  /**
+   * 下发指令 —— 真的交给执行层执行。
+   *
+   * 与服务端 /fleet/command 走同一套判定顺序：
+   *   校验设备 → 校验指令类型 → 建指令 → 落库 → 交执行层 → 回执推进。
+   *
+   * 关键：**直接指令**（起飞 / 悬停 / 降落 / 返航 / 暂停 / 继续 / 充电）
+   * 与**作业方式**是两条通道。早期版本只走作业方式分支，
+   * 导致静态部署下点「起飞」直接报「未知作业方式 undefined」。
+   */
+  fleetCommand(body) {
+    const b = body || {};
+    if (!b.deviceId) return { error: '缺少 deviceId' };
+    const device = this.store.listDevices().find(d => d.deviceId === b.deviceId);
+    const access = this.store.getDeviceAccess(b.deviceId);
+    const kind = device?.kind || access?.kind;
+    if (!kind) return { error: `设备 ${b.deviceId} 未登记` };
+
+    const check = validateCommand({ type: b.type, deviceId: b.deviceId, deviceKind: kind });
+    if (!check.ok) return { error: check.reason };
+
+    const cmd = {
+      commandId: `C-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      deviceId: b.deviceId,
+      tenantId: DEMO_IDENTITY.tenantId,
+      type: b.type,
+      missionId: b.missionId || null,
+      payload: b.payload || {},
+      state: '已下发',
+      issuedAt: Date.now(),
+      ackedAt: null,
+      doneAt: null,
+    };
+
+    // ---- 作业方式：先算航线，算不出来就不下发 ----
+    let plan = null;
+    const mode = operationMode(b.type);
+    if (mode) {
+      const dets = mode.id === 'spray_target' ? this.store.listDetections(2000) : [];
+      const built = buildOperationPlan({
+        field: this.field,
+        modeId: b.type,
+        detections: dets,
+        area: b.area || null,
+        zoneId: b.zoneId || null,
+        disease: b.disease || null,
+        agent: b.agent || null,
+        speedMs: Number(b.speedMs || 6),
+        swathM: b.swathM != null ? Number(b.swathM) : null,
+        doseLha: b.doseLha != null ? Number(b.doseLha) : null,
+        headingDeg: Number(b.headingDeg || 90),
+        deviceId: b.deviceId,
+      });
+      if (!built.ok) return { error: built.reason };
+      plan = built.plan;
+      const mission = {
+        ...plan.mission,
+        missionId: cmd.missionId || `M-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        createdAt: Date.now(),
+        status: 'pending',
+        deviceId: b.deviceId,
+        operationMode: b.type,
+      };
+      cmd.missionId = mission.missionId;
+      this.store.insertMission(mission);
+      this.emit('mission', mission);
+    }
+
+    this.store.insertCommand(cmd);
+    this.emit('command', cmd);
+
+    if (!this.sim) return { error: '设备执行层未启用' };
+    const r = this.sim.receiveCommand(cmd, plan);
+    if (r && r.ok === false) return { error: r.reason };
+    return {
+      ok: true,
+      command: r.command || cmd,
+      plan: plan ? {
+        lengthM: plan.summary.lengthM,
+        minutes: plan.summary.minutes,
+        volumeL: plan.summary.volumeL,
+        cells: plan.summary.cells,
+      } : null,
+    };
+  }
+
+  /** 装备台状态 */
+  fleetStatus() {
+    const devices = this.store.listDevices();
+    const cmds = this.store.listCommands(null, 200);
+    const active = new Map();
+    for (const c of cmds) {
+      if (c.state === '已完成' || c.state === '执行失败') continue;
+      const prev = active.get(c.deviceId);
+      if (!prev || c.issuedAt > prev.issuedAt) active.set(c.deviceId, c);
+    }
+    return {
+      devices, active: [...active.values()], recent: cmds.slice(0, 40),
+      states: { issued: '已下发', acked: '设备已接收', running: '执行中', done: '已完成', failed: '执行失败', timeout: '回执超时' },
+      speed: this.sim?.execSpeedFactor ?? 1,
+    };
+  }
+
+  /** 演示加速档位 */
+  fleetSpeed(factor) {
+    if (!this.sim) return { error: '设备执行层未启用' };
+    const r = this.sim.setExecSpeed(factor);
+    if (!r.ok) return { error: r.reason };
+    return r;
+  }
 }
 
 /** 全局唯一的后端不可达时的本地引擎 */
@@ -605,6 +801,41 @@ export const api = {
   /** 农户服务消息（公众号 / 小程序推送内容） */
   farmerMessages: () =>
     withFallback(() => get('/farmer/messages'), () => getLocalEngine().farmerMessages()),
+
+  /* ---- 装备操控 ---- */
+  /** 作业方式与直接指令目录 */
+  fleetModes: () =>
+    withFallback(() => get('/fleet/modes'), () => getLocalEngine().fleetModes()),
+  /** 装备台状态：设备、当前指令、执行历史 */
+  fleetStatus: () =>
+    withFallback(() => get('/fleet/status'), () => getLocalEngine().fleetStatus()),
+  /** 作业范围预览（只算不下发） */
+  fleetPlan: (body) => post('/fleet/plan', body),
+  /** 下发指令 —— 设备真的执行 */
+  fleetCommand: (body) => post('/fleet/command', body),
+  /** 演示加速档位：1 实时 / 10 / 60 / 300 */
+  fleetSpeed: (factor) => post('/fleet/speed', { factor }),
+
+  /**
+   * 通用 GET —— 按路径分发。
+   *
+   * 存在的意义：部署自检脚本与现场排障都需要按路径调接口，
+   * 而不是为每个接口在门面上开一个具名方法。
+   */
+  get: (path) => {
+    const map = {
+      '/meta': () => api.meta(),
+      '/devices': () => api.devices(),
+      '/fleet/modes': () => api.fleetModes(),
+      '/fleet/status': () => api.fleetStatus(),
+      '/metering/usage': () => api.usageList(),
+    };
+    if (map[path]) return map[path]();
+    return withFallback(() => get(path), () => null);
+  },
+
+  /** 通用 POST —— 网络失败自动落到浏览器内的本地引擎 */
+  post: (path, body) => post(path, body),
 };
 
 /** 带身份的 GET（底座接口需要 X-User-Id） */
@@ -699,6 +930,9 @@ export async function post(path, body) {
       return e.revokeDevice(path.split('/')[3], true);
     }
     if (path === '/access/commands') return e.issueCommandAction(body);
+    if (path === '/fleet/plan') return e.fleetPlan(body);
+    if (path === '/fleet/command') return e.fleetCommand(body);
+    if (path === '/fleet/speed') return e.fleetSpeed(body?.factor);
     if (path === '/tenancy/tenants') return e.addTenant(body);
     if (path === '/tenancy/members') return e.addMember(body);
     if (path === '/metering/usage') return e.reportUsage(body);
@@ -788,4 +1022,18 @@ export function subscribe(handlers) {
     try { ws?.close(); } catch { /* ignore */ }
     offLocal?.();
   };
+}
+
+/**
+ * 把 API 门面挂到 window 上。
+ *
+ * 两个用途：
+ *   1. 部署自检脚本（deploy/_test_fleet.mjs）需要从页面内部调用接口，
+ *      才能在「有后端」与「纯静态」两种部署下测同一套逻辑 ——
+ *      纯静态时前端会自动落到浏览器内的 LocalEngine。
+ *   2. 现场演示时在控制台里直接调 __suiyunApi.xxx() 排查问题。
+ */
+if (typeof window !== 'undefined') {
+  window.__suiyunApi = api;
+  window.__suiyunLocalEngine = getLocalEngine;
 }

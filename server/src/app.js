@@ -44,6 +44,11 @@ import { ONBOARDING_STEPS, CODE_SAMPLES } from '../../shared/openplatform.js';
 import {
   FARMER_MSG_TYPES, buildFarmerMessage, toPushPayload, WECHAT_SERVICE, nonEmptyMessages,
 } from '../../shared/farmer.js';
+import {
+  OPERATION_MODES, DIRECT_COMMANDS, COMMAND_TYPES,
+  operationMode, directCommand, validateCommand,
+  buildOperationPlan, cellsInArea, confirmedCellsInArea,
+} from '../../shared/fleet.js';
 
 /**
  * 创建 API 路由表。
@@ -56,9 +61,14 @@ import {
  * @param {object} deps.hub       链路质量统计（linkMetrics）
  * @param {function} deps.broadcast 实时广播
  * @param {object} deps.field     地块定义
+ * @param {function} [deps.deliverCommand] 把指令交给设备执行层
+ * @param {function} [deps.planOperation]  为作业方式指令计算航线（宿主实现）
  */
 export function createApiRouter(deps) {
-  const { store, platform, analytics, linkage, hub, broadcast, field: FIELD } = deps;
+  const {
+    store, platform, analytics, linkage, hub, broadcast, field: FIELD,
+    deliverCommand = null, planOperation = null,
+  } = deps;
 
   const api = deps.router;
 
@@ -506,6 +516,207 @@ export function createApiRouter(deps) {
       steps: ONBOARDING_STEPS.length,
       samples: CODE_SAMPLES.map(s => s.key),
     });
+  });
+
+  /* ================================================================
+   * 装备操控 —— 让平台从「只能看」变成「能操控」
+   *
+   * 这一组接口是老师要的「平台真正可操控可使用」的落点：
+   *   · /fleet/modes        作业方式与直接指令目录（前端渲染按钮用）
+   *   · /fleet/plan         作业方式 + 作业范围 → 航线预览（不下发）
+   *   · /fleet/command      下发指令 → 设备真的执行 → 回执推进
+   *   · /fleet/status       装备台：每台设备的状态、当前指令、执行历史
+   *
+   * 关键：下发指令不是「记一条日志」，而是真的交给设备执行层
+   * （deps.deliverCommand），设备按航线飞、拍、回传，链路才闭合。
+   * ================================================================ */
+
+  api.get('/fleet/modes', (req, res) => {
+    res.json({
+      modes: OPERATION_MODES,
+      directCommands: DIRECT_COMMANDS,
+      types: COMMAND_TYPES,
+    });
+  });
+
+  /**
+   * 作业范围预览：把「作业方式 + 范围」翻译成航线与作业单。
+   * 只算不下发 —— 前端用它画航线预览，用户确认后再调 /fleet/command。
+   */
+  api.post('/fleet/plan', (req, res) => {
+    const b = req.body || {};
+    const modeId = b.modeId || b.mode;
+    const mode = operationMode(modeId);
+    if (!mode) return res.status(400).json({ error: `未知作业方式 ${modeId}` });
+
+    const area = b.area || null;
+    // 靶向点喷要读识别结果来挑确诊网格
+    const dets = mode.id === 'spray_target'
+      ? store.listDetections(Number(b.detectionLimit || 2000))
+      : [];
+
+    const built = buildOperationPlan({
+      field: FIELD,
+      modeId,
+      detections: dets,
+      area,
+      zoneId: b.zoneId || null,
+      disease: b.disease || null,
+      agent: b.agent || null,
+      speedMs: Number(b.speedMs || 6),
+      swathM: b.swathM != null ? Number(b.swathM) : null,
+      doseLha: b.doseLha != null ? Number(b.doseLha) : null,
+      headingDeg: Number(b.headingDeg || 90),
+      deviceId: b.deviceId || null,
+    });
+    if (!built.ok) return res.status(400).json({ error: built.reason });
+
+    const plan = built.plan;
+    res.json({
+      mode: plan.mode,
+      // 航线路径：前端画线用（点数可能很多，截断避免响应过大）
+      path: plan.path.slice(0, 6000),
+      pathTotal: plan.path.length,
+      targetCells: plan.targetCells,
+      spray: plan.spray,
+      summary: plan.summary,
+      ratio: plan.ratio
+        ? {
+            requiredFlowLmin: plan.ratio.requiredFlowLmin,
+            dutyCycle: plan.ratio.dutyCycle,
+            flowPerSpeed: plan.ratio.flowPerSpeed,
+            speedRange: plan.ratio.speedRange,
+            feasible: plan.ratio.feasible,
+            totalVolumeL: plan.ratio.totalVolumeL,
+          }
+        : null,
+      // 预览用的作业单（不下发时只回显）
+      mission: plan.mission,
+    });
+  });
+
+  /**
+   * 下发指令。
+   *
+   * 这是整个操控链路的入口：
+   *   校验指令类型 → 建指令 → 落库 → 交给设备执行层 → 广播
+   * 执行层会随后产生回执（设备已接收 / 执行中 / 已完成），
+   * 回执由 /access/commands/:id/ack 之外的路���推送。
+   */
+  api.post('/fleet/command', require_('mission.dispatch'), (req, res) => {
+    const b = req.body || {};
+    const deviceId = b.deviceId;
+    if (!deviceId) return res.status(400).json({ error: '缺少 deviceId' });
+
+    // 设备必须已登记接入（与「设备接入」页的口径一致）
+    const access = store.getDeviceAccess(deviceId);
+    const device = store.listDevices().find(d => d.deviceId === deviceId);
+    const kind = device?.kind || access?.kind;
+    if (!kind) return res.status(404).json({ error: `设备 ${deviceId} 未登记` });
+
+    const check = validateCommand({ type: b.type, deviceId, deviceKind: kind });
+    if (!check.ok) return res.status(400).json({ error: check.reason });
+
+    const identity = resolveIdentity(req);
+    const cmd = {
+      commandId: `C-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      deviceId,
+      tenantId: identity.tenantId,
+      type: b.type,
+      missionId: b.missionId || null,
+      payload: b.payload || {},
+      state: COMMAND_STATES.issued,
+      issuedAt: Date.now(),
+      ackedAt: null,
+      doneAt: null,
+    };
+
+    // 作业方式指令：先算航线，算不出来就不下发
+    let plan = null;
+    const mode = operationMode(b.type);
+    if (mode) {
+      const dets = mode.id === 'spray_target'
+        ? store.listDetections(Number(b.detectionLimit || 2000))
+        : [];
+      const built = buildOperationPlan({
+        field: FIELD,
+        modeId: b.type,
+        detections: dets,
+        area: b.area || null,
+        zoneId: b.zoneId || null,
+        disease: b.disease || null,
+        agent: b.agent || null,
+        speedMs: Number(b.speedMs || 6),
+        swathM: b.swathM != null ? Number(b.swathM) : null,
+        doseLha: b.doseLha != null ? Number(b.doseLha) : null,
+        headingDeg: Number(b.headingDeg || 90),
+        deviceId,
+      });
+      if (!built.ok) return res.status(400).json({ error: built.reason });
+      plan = built.plan;
+      // 作业单先落库（待下发 → 执行中由执行层推进）
+      const mission = {
+        ...plan.mission,
+        missionId: cmd.missionId || `M-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        createdAt: Date.now(),
+        status: 'pending',
+        deviceId,
+        operationMode: b.type,
+      };
+      cmd.missionId = mission.missionId;
+      store.insertMission(mission);
+      broadcast('mission', mission);
+    }
+
+    store.insertCommand(cmd);
+    broadcast('command', cmd);
+
+    // 交给设备执行层：指令真的会执行
+    if (deliverCommand) {
+      try {
+        const r = deliverCommand(cmd, plan);
+        if (r && r.ok === false) {
+          return res.status(400).json({ error: r.reason || '指令下发失败' });
+        }
+      } catch (e) {
+        return res.status(500).json({ error: `指令下发异常：${e.message}` });
+      }
+    }
+
+    res.json({ ok: true, command: cmd, plan: plan ? plan.summary : null });
+  });
+
+  /** 装备台状态：设备、当前指令、执行历史 */
+  api.get('/fleet/status', (req, res) => {
+    const devices = store.listDevices();
+    const cmds = store.listCommands(null, 200);
+    const active = new Map();
+    for (const c of cmds) {
+      // 取每台设备最新的一条未终结指令
+      if (c.state === COMMAND_STATES.done || c.state === COMMAND_STATES.failed) continue;
+      const prev = active.get(c.deviceId);
+      if (!prev || c.issuedAt > prev.issuedAt) active.set(c.deviceId, c);
+    }
+    res.json({
+      devices,
+      active: [...active.values()],
+      recent: cmds.slice(0, 40),
+      states: COMMAND_STATES,
+      speed: deps.execSpeed ? deps.execSpeed() : 1,
+    });
+  });
+
+  /**
+   * 演示加速档位。
+   *
+   * 一趟靶向点喷要飞十几分钟，评审现场不能干等。
+   * 加速的是墙钟等待 —— 电量、药耗、里程仍按真实经过的仿真时间计算。
+   */
+  api.post('/fleet/speed', (req, res) => {
+    if (!deps.setExecSpeed) return res.json({ error: '当前运行时不支持加速' }, 400);
+    const r = deps.setExecSpeed(Number(req.body?.factor ?? 1));
+    if (!r.ok) return res.json({ error: r.reason }, 400);
+    res.json(r);
   });
 
   api.get('/meta', (req, res) => res.json(platform.meta()));

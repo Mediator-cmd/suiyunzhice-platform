@@ -126,10 +126,29 @@ function broadcast(type, payload) {
  * 不会出现「本机好使、云端字段不一样」的口径漂移。
  * ================================================================ */
 
+/**
+ * 把平台下发的指令交给设备执行层。
+ *
+ * 这是「能操控」与「只能看」的分界线：
+ * 指令不是记一条日志，而是真的让设备飞起来 / 开过去。
+ *
+ * sim 在下方创建（需要 async 的 store 装配顺序），这里用可变引用。
+ */
+let sim = null;
+function deliverCommandToDevice(cmd, plan) {
+  if (!sim) return { ok: false, reason: '设备执行层未启用（SIM=0）' };
+  const r = sim.receiveCommand(cmd, plan);
+  if (r && r.ok === false) return r;
+  return { ok: true };
+}
+
 const mini = new MiniRouter();
 mini.use(corsMiddleware);
 createApiRouter({
   router: mini, store, platform, analytics, linkage, hub, broadcast, field: FIELD,
+  deliverCommand: (cmd, plan) => deliverCommandToDevice(cmd, plan),
+  execSpeed: () => sim?.execSpeedFactor ?? 1,
+  setExecSpeed: (f) => (sim ? sim.setExecSpeed(f) : { ok: false, reason: '设备执行层未启用' }),
 });
 
 const app = express();
@@ -185,7 +204,7 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 if (SIM) {
-  const sim = new Simulator({
+  sim = new Simulator({
     field: FIELD,
     onDevice: (d) => store.upsertDevice(d),
     onTelemetry: (t, latency) => {
@@ -219,6 +238,36 @@ if (SIM) {
       } catch (e) {
         console.error('[detect]', e.message);
       }
+    },
+    /* ---- 受控执行层回调：平台指令的执行回执 ---- */
+    onCommand: (c) => {
+      store.insertCommand(c);
+      broadcast('commandStatus', c);
+    },
+    onMission: (m) => {
+      // 完整作业单 → 插入；只有状态 → 更新（避免 INSERT OR REPLACE 覆盖原始字段）
+      if (m.plan || m.target) {
+        store.insertMission(m);
+        broadcast('mission', m);
+      } else {
+        store.updateMissionStatus(m.missionId, m.status);
+        broadcast('missionStatus', { missionId: m.missionId, status: m.status });
+      }
+    },
+    onUsage: (u) => {
+      store.insertUsage({
+        ts: Date.now(),
+        tenantId: u.tenantId || 't-demo',
+        missionId: u.missionId || null,
+        type: u.type || 'spray',
+        areaMu: u.areaMu ?? null,
+        volumeL: u.volumeL ?? null,
+        minutes: u.minutes ?? null,
+        sorties: 1,
+        detections: u.detections ?? 0,
+        savedL: u.savedL ?? null,
+        amount: null,
+      });
     },
   });
   sim.start();

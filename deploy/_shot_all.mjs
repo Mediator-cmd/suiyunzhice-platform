@@ -19,6 +19,8 @@ mkdirSync(OUT, { recursive: true });
 const PAGES = [
   ['overview',   '总览'],
   ['realtime',   '实时监控'],
+  ['fleet',      '装备操控台'],
+  ['dispatch',   '作业调度'],
   ['linkage',    '空地联动'],
   ['analytics',  '数据分析'],
   ['agro',       '农情策略'],

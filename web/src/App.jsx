@@ -31,6 +31,8 @@ import Access       from './pages/Access.jsx';
 import Metering     from './pages/Metering.jsx';
 import Developers   from './pages/Developers.jsx';
 import Mobile       from './pages/Mobile.jsx';
+import Fleet        from './pages/Fleet.jsx';
+import Dispatch     from './pages/Dispatch.jsx';
 
 /**
  * 板块设置（信息架构）
@@ -65,6 +67,8 @@ const NAV_GROUPS = [
     items: [
       { id: 'overview',   label: '总览',     icon: 'grid',   sub: '平台全局指标与地块态势' },
       { id: 'realtime',   label: '实时监控', icon: 'radar',  sub: '现场实景、链路质量与气象条件' },
+      { id: 'fleet',      label: '装备操控台', icon: 'console', sub: '设备状态、实时监控画面与直接指令' },
+      { id: 'dispatch',   label: '作业调度', icon: 'route',   sub: '框选作业范围、选作业方式、下发执行' },
       { id: 'linkage',    label: '空地联动', icon: 'link',   sub: '三者实时协同闭环' },
     ],
   },
@@ -265,6 +269,7 @@ export default function App() {
 
   const Page = {
     overview: Overview, realtime: Realtime, linkage: Linkage,
+    fleet: Fleet, dispatch: Dispatch,
     analytics: Analytics, agro: Agro, planner: Planner, planning: Planning,
     farm: Farm, arch: Architecture,
     tenancy: Tenancy, access: Access, metering: Metering, developers: Developers,

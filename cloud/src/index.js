@@ -240,6 +240,37 @@ export class PlatformState {
         this.broadcast('telemetry', { ...t, latencyMs: latency });
       },
       onDetection: (d) => { this.onDetection(d); },
+      /* ---- 受控执行层回调：平台指令的执行回执 ---- */
+      onCommand: (c) => {
+        this.store.insertCommand(c);
+        this.broadcast('commandStatus', c);
+      },
+      onMission: (m) => {
+        // 完整作业单 → 插入；只有状态 → 更新
+        // （INSERT OR REPLACE 会覆盖原始字段，把航线与药耗清空）
+        if (m.plan || m.target) {
+          this.store.insertMission(m);
+          this.broadcast('mission', m);
+        } else {
+          this.store.updateMissionStatus(m.missionId, m.status);
+          this.broadcast('missionStatus', { missionId: m.missionId, status: m.status });
+        }
+      },
+      onUsage: (u) => {
+        this.store.insertUsage({
+          ts: Date.now(),
+          tenantId: u.tenantId || 't-demo',
+          missionId: u.missionId || null,
+          type: u.type || 'spray',
+          areaMu: u.areaMu ?? null,
+          volumeL: u.volumeL ?? null,
+          minutes: u.minutes ?? null,
+          sorties: 1,
+          detections: u.detections ?? 0,
+          savedL: u.savedL ?? null,
+          amount: null,
+        });
+      },
     });
     // 手动模式：不用 setInterval，由 alarm 驱动 tick()
     this.sim.start(SIM_TICK_MS, { manual: true, state: saved });
@@ -261,6 +292,19 @@ export class PlatformState {
     if (!buf || buf.length === 0) return;
     for (const { t, latency } of buf) this.store.insertTelemetry(t, latency);
     buf.length = 0;
+  }
+
+  /**
+   * 把平台下发的指令交给设备执行层。
+   *
+   * 云端与本机走的是同一套 shared/ 执行逻辑，
+   * 因此「云端下发的指令会真的执行」这件事两端一致。
+   */
+  deliverCommand(cmd, plan) {
+    if (!this.sim) return { ok: false, reason: '设备执行层未启用（SIM=0）' };
+    const r = this.sim.receiveCommand(cmd, plan);
+    if (r && r.ok === false) return r;
+    return { ok: true };
   }
 
   /**
@@ -422,6 +466,13 @@ export class PlatformState {
       hub: this.hub,
       broadcast: (t, p) => this.broadcast(t, p),
       field: this.platform.field,
+      // 把指令交给设备执行层 —— 云端下发的指令同样会真的执行
+      deliverCommand: (cmd, plan) => this.deliverCommand(cmd, plan),
+      // 演示加速档位：云端每拍 15 秒，加速同样按仿真时间计物理量
+      execSpeed: () => this.sim?.execSpeedFactor ?? 1,
+      setExecSpeed: (f) => (this.sim
+        ? this.sim.setExecSpeed(f)
+        : { ok: false, reason: '设备执行层未启用' }),
     });
 
     const mres = await mini.handle(mreq);

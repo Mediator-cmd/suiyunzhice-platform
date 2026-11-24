@@ -1,5 +1,5 @@
-import React, { useMemo, useEffect, useState } from 'react';
-import { MapContainer, Polygon, Polyline, Marker, CircleMarker, Tooltip, Rectangle, ImageOverlay, useMap } from 'react-leaflet';
+import React, { useMemo, useEffect, useState, useRef } from 'react';
+import { MapContainer, Polygon, Polyline, Marker, CircleMarker, Tooltip, Rectangle, ImageOverlay, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { MAP, DISEASE_COLOR } from '../theme.js';
 import { SATELLITE_BASEMAP } from '../assets.js';
@@ -70,6 +70,11 @@ const BASEMAPS = [
 export function FieldMap({
   field, route, devices, detections, events, missions, height = 460,
   onGridClick, selectedGrid, showBasemap = true,
+  /* ---- 作业范围框选（作业调度页用） ---- */
+  range = null,                 // { x, y, w, h } —— 已确认的作业范围（局部米制）
+  onRangeChange = null,         // (rect|null) => void —— 拖动/新建时回调
+  plannedPath = null,           // [{x,y}] —— 规划航线预览
+  plannedCells = null,          // [{row,col}] —— 靶向网格高亮
 }) {
   const [base, setBase] = useState('terrain');
 
@@ -356,6 +361,56 @@ export function FieldMap({
           <Polyline positions={routeLine} pathOptions={{ color: MAP.route, weight: 2.6, opacity: 1 }} />
         )}
 
+        {/* ---- 作业范围框选（作业调度页） ---- */}
+        {range && (
+          <Rectangle
+            bounds={[toLL(range.x, range.y), toLL(range.x + range.w, range.y + range.h)]}
+            pathOptions={{
+              color: '#b54708', weight: 2.4, dashArray: '6 5',
+              fill: true, fillColor: '#b54708', fillOpacity: 0.10,
+            }}
+          />
+        )}
+
+        {/* ---- 靶向网格高亮（作业调度页） ---- */}
+        {plannedCells?.length > 0 && (() => {
+          const cw = field.widthM / field.gridCols;
+          const ch = field.heightM / field.gridRows;
+          return plannedCells.map(c => (
+            <Rectangle
+              key={`pc_${c.row}_${c.col}`}
+              bounds={[toLL(c.col * cw, c.row * ch), toLL((c.col + 1) * cw, (c.row + 1) * ch)]}
+              pathOptions={{
+                color: '#b42318', weight: 1, fill: true,
+                fillColor: '#b42318', fillOpacity: 0.22,
+              }}
+            />
+          ));
+        })()}
+
+        {/* ---- 规划航线预览（作业调度页） ---- */}
+        {plannedPath?.length > 1 && (
+          <>
+            <Polyline
+              positions={plannedPath.map(p => toLL(p.x, p.y))}
+              pathOptions={{ color: '#0f766e', weight: 2.2, opacity: 0.95, dashArray: '1 0' }}
+            />
+            {/* 起点 */}
+            <CircleMarker
+              center={toLL(plannedPath[0].x, plannedPath[0].y)}
+              radius={5}
+              pathOptions={{ color: '#0f766e', weight: 2, fillColor: '#ffffff', fillOpacity: 1 }}
+            >
+              <Tooltip>航线起点</Tooltip>
+            </CircleMarker>
+          </>
+        )}
+
+        {/* ---- 范围框选交互层 ---- */}
+        {onRangeChange && (
+          <RangeDrawer field={field} range={range} onRangeChange={onRangeChange} geo={geo} />
+        )}
+
         {/* 联动事件 */}
         {eventMarks.map(({ e, pos }) => (
           <CircleMarker key={e.eventId} center={pos} radius={7}
@@ -406,6 +461,128 @@ export function FieldMap({
       )}
     </div>
   );
+}
+
+/**
+ * 作业范围框选交互层。
+ *
+ * 用法：在地图上按住拖出一个矩形 → 回调 onRangeChange(rect)。
+ * 坐标一律换算回平台的局部 ENU 米制（x 东、y 南），
+ * 与规划器、作业单、网格编号同一坐标系，不能直接用经纬度。
+ */
+function RangeDrawer({ field, range, onRangeChange, geo }) {
+  const map = useMap();
+  const startRef = useRef(null);
+  // 拖拽矩形同时存 ref：mouseup 拿到的必须是**最新**的值，
+  // 而 React 的 state 更新是异步的 —— 只用 state 的话，
+  // 快速拖一下时 mouseup 读到的还是上一帧的旧矩形，框选会失效。
+  const dragRef = useRef(null);
+  const [drag, setDrag] = useState(null);
+
+  // 局部 ENU → Leaflet
+  const M_PER_DEG_LAT = 111320;
+  const M_PER_DEG_LON = 111320 * Math.cos(((field?.lat ?? 0) * Math.PI) / 180);
+  const toLL = geo
+    ? (x, y) => [field.lat - (y / M_PER_DEG_LAT), field.lon + (x / M_PER_DEG_LON)]
+    : (x, y) => [y, x];
+  // Leaflet → 局部 ENU
+  const toEnu = geo
+    ? (lat, lon) => ({
+        x: (lon - field.lon) * M_PER_DEG_LON,
+        y: (field.lat - lat) * M_PER_DEG_LAT,
+      })
+    : (lat, lon) => ({ x: lon, y: lat });
+
+  // handler 只订阅一次，所以它读到的一切都要走 ref —— 否则闭包里
+  // 固化的是首次渲染时的 field / geo / onRangeChange。
+  const toEnuRef = useRef(toEnu);
+  toEnuRef.current = toEnu;
+  const fieldRef = useRef(field);
+  fieldRef.current = field;
+  const onRangeChangeRef = useRef(onRangeChange);
+  onRangeChangeRef.current = onRangeChange;
+
+  // 事件订阅必须只做一次。
+  //
+  // useMapEvents 内部在每次渲染时都会重新订阅（它把 handler 放进
+  // useEffect 的依赖里）。而拖拽过程中 setDrag 会触发重渲染，
+  // 于是订阅被反复拆除重建 —— 拖到一半的 mousemove 就丢了，
+  // 框选出来只有几米大。
+  //
+  // 解决办法：用 ref 固定 handler 引用，依赖数组为空，
+  // 整个拖拽期间始终是同一份订阅。
+  const handlersRef = useRef(null);
+  if (!handlersRef.current) {
+    handlersRef.current = {
+      mousedown(e) {
+        if (e.originalEvent.button !== 0) return;
+        const p = toEnuRef.current(e.latlng.lat, e.latlng.lng);
+        startRef.current = { x: p.x, y: p.y };
+        const d = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
+        dragRef.current = d;
+        setDrag(d);
+      },
+      mousemove(e) {
+        if (!startRef.current) return;
+        const p = toEnuRef.current(e.latlng.lat, e.latlng.lng);
+        const d = { ...dragRef.current, x1: p.x, y1: p.y };
+        dragRef.current = d;
+        setDrag(d);
+      },
+      mouseup() {
+        const d = dragRef.current;
+        startRef.current = null;
+        dragRef.current = null;
+        setDrag(null);
+        if (!d) return;
+        const x = Math.min(d.x0, d.x1), y = Math.min(d.y0, d.y1);
+        const w = Math.abs(d.x1 - d.x0), h = Math.abs(d.y1 - d.y0);
+        // 太小的框视为误触，保持原状
+        if (w < 4 || h < 4) return;
+        onRangeChangeRef.current({
+          x: clamp(x, 0, fieldRef.current.widthM - w),
+          y: clamp(y, 0, fieldRef.current.heightM - h),
+          w, h,
+        });
+      },
+    };
+  }
+
+  useMapEvents(handlersRef.current);
+
+  /**
+   * 框选模式下关掉地图平移。
+   *
+   * 原因：Leaflet 默认开启 dragging —— 按下鼠标后拖动会平移地图，
+   * 于是「鼠标屏幕坐标 → 地理坐标」的映射在拖拽过程中不断变化，
+   * mousemove 读到的 latlng 不再对应光标位置，框选框会缩成一小块。
+   *
+   * 关掉之后，拖动只用于框选；想平移地图用滚轮缩放或按「清除」后再拖。
+   */
+  useEffect(() => {
+    const d = map.dragging;
+    if (!d) return undefined;
+    const wasEnabled = d.enabled();
+    if (wasEnabled) d.disable();
+    return () => { if (wasEnabled) d.enable(); };
+  }, [map]);
+
+  // 拖动中的临时框
+  const preview = drag ? {
+    x: Math.min(drag.x0, drag.x1), y: Math.min(drag.y0, drag.y1),
+    w: Math.abs(drag.x1 - drag.x0), h: Math.abs(drag.y1 - drag.y0),
+  } : null;
+
+  return preview ? (
+    <Rectangle
+      bounds={[toLL(preview.x, preview.y), toLL(preview.x + preview.w, preview.y + preview.h)]}
+      pathOptions={{ color: '#b54708', weight: 2, dashArray: '4 4', fill: true, fillColor: '#b54708', fillOpacity: 0.14 }}
+    />
+  ) : null;
+}
+
+function clamp(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, v));
 }
 
 /**
