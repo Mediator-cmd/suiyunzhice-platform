@@ -14,7 +14,7 @@
 import { DISEASES, DEVICE_STATES } from './schema.js';
 
 export class Simulator {
-  constructor({ field, onTelemetry, onDetection, onDevice }) {
+  constructor({ field, onTelemetry, onDetection, onDevice, dt = 0.2, detectChance = null }) {
     this.field = field;
     this.onTelemetry = onTelemetry || (() => {});
     this.onDetection = onDetection || (() => {});
@@ -22,6 +22,29 @@ export class Simulator {
     this.timer = null;
     this.seq = { 'UAV-01': 0, 'ROB-01': 0 };
     this.detSeq = 0;
+
+    /**
+     * 每拍推进的模拟时长（秒）。
+     *
+     * 默认 0.2 是配合 200ms 的定时间隔 —— 本机版一直这么跑。
+     * 云端受 Durable Object 的免费额度限制，只能每 15 秒唤醒一次，
+     * 此时 dt 仍是 0.2 会让设备看起来慢放 75 倍（跨完一块地要几小时）。
+     * 所以云端把 dt 调成 1，让「每拍推进 1 秒」与「每 15 秒醒一次」相配合：
+     * 设备运动速度与真实一致，只是刷新频率低一些。
+     */
+    this.dt = dt;
+    /**
+     * 每次触发的检出概率。
+     *
+     * 默认按 dt 缩放（dt=0.2 时等于 0.16，行为与从前完全一致）。
+     * 但云端不能这样缩放：云端 15 秒才醒一拍，缩放后概率会超过 1 ——
+     * 每拍必检出，检出量反而暴涨。而 Durable Object 免费额度按行写入计，
+     * 最耗额度的恰恰是检出与联动事件。
+     * 所以云端显式传 detectChance，把它压到每拍一个小概率。
+     */
+    this.detectChance = detectChance ?? (0.16 * (dt / 0.2));
+    /** 电量消耗按 dt 缩放，保持「每小时耗电多少」与真实一致。 */
+    this.k = dt / 0.2;
 
     // 病害分布：几个病灶中心
     this.hotspots = [
@@ -91,7 +114,7 @@ export class Simulator {
   }
 
   tick() {
-    const dt = 0.2; // 与 intervalMs 一致
+    const dt = this.dt; // 构造时指定，云端用 1s，本机用 0.2s
     try { this.stepUav(dt); } catch (e) { logErr('stepUav', e); }
     try { this.stepRobot(dt); } catch (e) { logErr('stepRobot', e); }
   }
@@ -110,14 +133,14 @@ export class Simulator {
       u.y = 50; u.x = 10; u.dir = 1; u.line = 0;
       u.coverage = 0;
     }
-    u.batt = Math.max(15, u.batt - 0.012);
+    u.batt = Math.max(15, u.batt - 0.012 * this.k);
     u.coverage = Math.min(1, (u.line * lineHeight) / maxY);
 
     this.emitTelemetry(u);
     this.syncDevice(u);
 
     // 沿途识别：按概率产生检测结果
-    if (Math.random() < 0.16) this.emitDetection(u);
+    if (Math.random() < this.detectChance) this.emitDetection(u);
   }
 
   stepRobot(dt) {
@@ -143,7 +166,7 @@ export class Simulator {
       }
     } else if (r.state === DEVICE_STATES.SURVEYING) {
       r.collectT = (r.collectT || 0) + dt;
-      r.batt = Math.max(10, r.batt - 0.008);
+      r.batt = Math.max(10, r.batt - 0.008 * this.k);
       if (r.collectT > 3) {
         // 采集完成，回传近距识别结果
         this.emitRobotDetection(r);

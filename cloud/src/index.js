@@ -33,6 +33,40 @@ import { seedAgroHistory } from '../../shared/agroseed.js';
 /** 遥测保留时长：1 小时。平台上用不到更早的遥测。 */
 const TELEMETRY_KEEP_MS = 60 * 60 * 1000;
 
+/**
+ * 云端模拟器节奏：每 15 秒推进一次。
+ *
+ * 为什么不是 1 秒或 5 秒：Durable Object 免费额度按「行写入」计，
+ * 而遥测是产出速率固定的（每拍每设备 1 条），批量落库只能减少往返、
+ * 不能减少总行数 —— 真正的杠杆是把产出速率压下来。
+ *
+ * 15 秒一拍 × 2 台设备 = 每天 1.15 万行遥测；
+ * 加上裁剪删除（稳态≈写入量）、设备 upsert、检出与联动事件，
+ * 合计约 5.2 万行/天，在 10 万行/天的免费额度内留足余量。
+ *
+ * 代价：页面上的实时曲线刷新间隔变成 15 秒。
+ * 这不影响演示 —— 遥测的时延、P95、丢包率等指标本身是在设备侧产生的真实值。
+ */
+const SIM_TICK_MS = 15000;
+
+/**
+ * 每多少拍把遥测缓冲刷进库。
+ *
+ * 遥测在库里只用于「页面首屏画一条历史曲线」，
+ * 实时曲线由 WebSocket 推送，不依赖库的写入频率。
+ * 批量落库主要减少往返开销，不减少总行数。
+ */
+const TELEMETRY_FLUSH_EVERY_TICKS = 3;
+
+/**
+ * 每多少拍裁剪一次遥测。
+ *
+ * 每拍写 2 行遥测，保留 1 小时 = 240 行；裁剪周期必须远小于保留窗口，
+ * 否则「删掉的行数」会和「写入的行数」打平，白白吃掉一半额度。
+ * 60 拍 = 15 分钟一次，保留窗口 1 小时 = 4 倍余量，安全。
+ */
+const PRUNE_EVERY_TICKS = 60;
+
 export default {
   /**
    * HTTP 入口。
@@ -175,9 +209,32 @@ export class PlatformState {
     const saved = await this.state.storage.get('simState');
     this.sim = new Simulator({
       field: this.platform.field,
-      onDevice: (d) => { this.store.upsertDevice(d); },
+      // 每拍推进 15 秒：与「每 15 秒醒一次」相配合，设备运动速度与真实一致
+      dt: 15,
+      // 每拍检出概率。云端一拍的时长是本机的 75 倍，
+      // 若沿用按 dt 缩放的比例，概率会超过 1（每拍必检出），
+      // 检出与联动事件会瞬间吃掉 DO 的免费额度。
+      // 这里取一个与「每分钟约 1 条检出」相称的小概率。
+      detectChance: 0.16,
+      onDevice: (d) => {
+        // 设备表是高频 upsert（每拍 2 次），按节流窗口合并写入，
+        // 否则光设备表一天就是 3 万多次写入，很快撞上 DO 免费额度。
+        this.pendingDevice = this.pendingDevice || new Map();
+        this.pendingDevice.set(d.deviceId, d);
+      },
       onTelemetry: (t, latency) => {
-        this.store.insertTelemetry(t, latency);
+        // 遥测入内存缓冲，按固定间隔批量落库。
+        //
+        // 为什么要批量、间隔还这么长：
+        //   实时曲��完全由 WebSocket 推送（每拍都发），
+        //   库里的遥测只用于「页面首次加载时画一条历史曲线」。
+        //   而 Durable Object 免费额度按行写入计，
+        //   每拍 2 行直接落库，一天就是 3.4 万行遥测 + 3.4 万行裁剪删除，
+        //   再加检出与联动事件会直接爆掉 10 万行/天的额度。
+        //   所以只在需要时落一小批：首屏有曲线可画，额度几乎不占。
+        this.pendingTelemetry = this.pendingTelemetry || [];
+        this.pendingTelemetry.push({ t, latency });
+
         // 模拟器不经 WebSocket，需显式登记链路质量，否则「实时监控」页无指标
         this.hub.recordTelemetry(t.deviceId, t.kind, latency, t.seq, t.state);
         this.broadcast('telemetry', { ...t, latencyMs: latency });
@@ -185,10 +242,25 @@ export class PlatformState {
       onDetection: (d) => { this.onDetection(d); },
     });
     // 手动模式：不用 setInterval，由 alarm 驱动 tick()
-    this.sim.start(1000, { manual: true, state: saved });
-    // 立刻排一次 alarm，并让它每 1 秒再触发
+    this.sim.start(SIM_TICK_MS, { manual: true, state: saved });
+    // 立刻排一次 alarm，并让它按固定节奏再触发
     const existing = await this.state.storage.getAlarm();
-    if (!existing) await this.state.storage.setAlarm(Date.now() + 1000);
+    if (!existing) await this.state.storage.setAlarm(Date.now() + SIM_TICK_MS);
+  }
+
+  /** 把节流攒下的设备状态落库 */
+  flushDevices() {
+    if (!this.pendingDevice || this.pendingDevice.size === 0) return;
+    for (const d of this.pendingDevice.values()) this.store.upsertDevice(d);
+    this.pendingDevice.clear();
+  }
+
+  /** 把节流攒下的遥测落库 */
+  flushTelemetry() {
+    const buf = this.pendingTelemetry;
+    if (!buf || buf.length === 0) return;
+    for (const { t, latency } of buf) this.store.insertTelemetry(t, latency);
+    buf.length = 0;
   }
 
   /**
@@ -206,14 +278,23 @@ export class PlatformState {
           await this.state.storage.put('simState', this.sim.snapshot());
         }
       }
+      // 设备表与遥测落库
+      //
+      // 遥测每 15 拍（75 秒）落一批即可：库里只用于首屏曲线，
+      // 实时部分由 WebSocket 推送，不依赖库的写入频率。
+      this.flushTick = (this.flushTick || 0) + 1;
+      if (this.flushTick % 3 === 0) this.flushDevices();
+      if (this.flushTick % TELEMETRY_FLUSH_EVERY_TICKS === 0) this.flushTelemetry();
       // 定期裁剪遥测表。
       //
-      // 遥测是高频数据（2 台设备 × 1 Hz = 每天 17 万行），
-      // 不裁剪的话存储会一直涨，最终撞上免费额度。
+      // 遥测是高频表，不裁剪会一直涨，最终撞上免费额度。
       // 平台上真正用到的遥测只有「最近一小时」——
       // 实时监控看曲线、链路质量看 P95/丢包率，都用不到更早的数据。
+      //
+      // 注意：裁剪本身也是写操作（DELETE 同样计费），
+      // 所以保留窗口要留够余量，别让「写进去」和「删掉」的量打平。
       this.pruneTick = (this.pruneTick || 0) + 1;
-      if (this.pruneTick % 60 === 0) {
+      if (this.pruneTick % PRUNE_EVERY_TICKS === 0) {
         this.store.pruneTelemetry(TELEMETRY_KEEP_MS);
       }
       // 链路统计是内存态，持久化后对象被驱逐也不丢
@@ -224,7 +305,7 @@ export class PlatformState {
       console.error('[sim]', e?.message || e);
     }
     // 排下一次
-    await this.state.storage.setAlarm(Date.now() + 1000);
+    await this.state.storage.setAlarm(Date.now() + SIM_TICK_MS);
   }
 
   /** 检测结果处理：联动闭环 + 派单 */
