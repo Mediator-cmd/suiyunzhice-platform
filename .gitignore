@@ -19,6 +19,9 @@ npm-debug.log*
 # 本地 Claude Code 配置（不入库）
 .claude/
 
+# Cloudflare Wrangler 本地状态与构建产物
+.wrangler/
+
 # 规划调试产物
 plan_t.json
 plan_tmp.json
