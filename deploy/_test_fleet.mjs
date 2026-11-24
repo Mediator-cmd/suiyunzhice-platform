@@ -122,7 +122,10 @@ if (!box) {
     say(`    本次作业单 = ${missionId || '(未取到)'}`);
 
     let used = null;
-    for (let i = 0; i < 30; i++) {
+    // 云端 Durable Object 15 秒才醒一拍，一拍最多推进 60 秒仿真时间；
+    // 一趟 4~5 分钟的作业要跑满 5 拍 ≈ 75 秒墙钟。
+    // 本机 0.2 秒一拍，几十毫秒就结束 —— 所以这里等得长一点，两边通用。
+    for (let i = 0; i < 140; i++) {
       await page.waitForTimeout(800);
       const usage = await apiGet('/metering/usage');
       const rows = Array.isArray(usage) ? usage : (usage.usage || []);
