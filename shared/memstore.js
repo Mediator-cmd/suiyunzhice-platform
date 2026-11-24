@@ -90,7 +90,12 @@ export class MemoryStore {
     if (i >= 0) this.detections[i] = rec; else this.detections.push(rec);
   }
   listDetections(limit = 500) {
-    return this.detections.slice().sort((a, b) => b.ts - a.ts).slice(0, limit);
+    // 排序键与两个 SQL 版存储一致：先按 ts 倒序，同 ts 再按 det_id 倒序。
+    // 少了第二排序键，同一批数据在浏览器与云端会返回不同顺序，
+    // 页面表格里的行序就会不一致 —— 这是口径漂移的隐蔽来源。
+    return this.detections.slice()
+      .sort((a, b) => (b.ts - a.ts) || String(b.detId).localeCompare(String(a.detId)))
+      .slice(0, limit);
   }
 
   // ---- 任务 ----
@@ -134,12 +139,16 @@ export class MemoryStore {
     if (m) m.status = status;
   }
   listMissions(limit = 200) {
-    return this.missions.slice().sort((a, b) => b.createdAt - a.createdAt).slice(0, limit);
+    // 与 SQL 版存储的排序键一致（created_at 倒序 → mission_id 倒序）
+    return this.missions.slice()
+      .sort((a, b) => (b.createdAt - a.createdAt) || String(b.missionId).localeCompare(String(a.missionId)))
+      .slice(0, limit);
   }
   /** 按类型取任务：复核任务量远大于施药任务，按类型取可避免统计口径被挤掉 */
   listMissionsByType(type, limit = 200) {
     return this.missions.filter(m => m.type === type)
-      .sort((a, b) => b.createdAt - a.createdAt).slice(0, limit);
+      .sort((a, b) => (b.createdAt - a.createdAt) || String(b.missionId).localeCompare(String(a.missionId)))
+      .slice(0, limit);
   }
 
   // ---- 联动事件 ----
@@ -158,7 +167,10 @@ export class MemoryStore {
     if (i >= 0) this.linkEvents[i] = rec; else this.linkEvents.push(rec);
   }
   listLinkEvents(limit = 200) {
-    return this.linkEvents.slice().sort((a, b) => b.ts - a.ts).slice(0, limit);
+    // 与 SQL 版存储的排序键一致（ts 倒序 → event_id 倒序）
+    return this.linkEvents.slice()
+      .sort((a, b) => (b.ts - a.ts) || String(b.eventId).localeCompare(String(a.eventId)))
+      .slice(0, limit);
   }
 
   // ---- 施药记录 ----
@@ -230,7 +242,9 @@ export class MemoryStore {
     });
   }
   listCommands(deviceId = null, limit = 200) {
-    let all = [...this.commands.values()].sort((a, b) => b.issuedAt - a.issuedAt);
+    // 与 SQL 版存储的排序键一致（issued_at 倒序 → command_id 倒序）
+    let all = [...this.commands.values()]
+      .sort((a, b) => (b.issuedAt - a.issuedAt) || String(b.commandId).localeCompare(String(a.commandId)));
     if (deviceId) all = all.filter(c => c.deviceId === deviceId);
     return all.slice(0, limit);
   }
@@ -246,6 +260,12 @@ export class MemoryStore {
   }
   listUsage(tenantId = null, limit = 500) {
     const arr = tenantId ? this.usage.filter(u => u.tenantId === tenantId) : this.usage;
-    return arr.slice().sort((a, b) => b.ts - a.ts).slice(0, limit);
+    // 与 SQL 版存储的排序键一致（ts 倒序 → id 倒序）。
+    // usage_records 的 id 是自增列，内存版用插入序号模拟。
+    return arr.slice()
+      .map((u, i) => ({ u, i }))
+      .sort((a, b) => (b.u.ts - a.u.ts) || (b.i - a.i))
+      .map(x => x.u)
+      .slice(0, limit);
   }
 }

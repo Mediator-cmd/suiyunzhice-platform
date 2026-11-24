@@ -198,9 +198,12 @@ export class Store {
         nz(latency), JSON.stringify(t.payload || {}));
   }
   recentTelemetry(limit = 200, deviceId = null) {
+    // 取最近 N 条，按时间正序返回。
+    // 外层的 ts ASC, id ASC 是必要的：只按 ts 排序时，同一时刻的多帧
+    // 顺序不确定，浏览器版与云端版会返回不同序列。
     const sql = deviceId
-      ? `SELECT * FROM (SELECT * FROM telemetry WHERE device_id=? ORDER BY ts DESC LIMIT ?) ORDER BY ts`
-      : `SELECT * FROM (SELECT * FROM telemetry ORDER BY ts DESC LIMIT ?) ORDER BY ts`;
+      ? `SELECT * FROM (SELECT * FROM telemetry WHERE device_id=? ORDER BY ts DESC, id DESC LIMIT ?) ORDER BY ts ASC, id ASC`
+      : `SELECT * FROM (SELECT * FROM telemetry ORDER BY ts DESC, id DESC LIMIT ?) ORDER BY ts ASC, id ASC`;
     const args = deviceId ? [deviceId, limit] : [limit];
     return this.db.prepare(sql).all(...args).map(r => ({
       ts: r.ts, deviceId: r.device_id, kind: r.kind, state: r.state,
@@ -227,7 +230,7 @@ export class Store {
         nz(d.model ?? 'SAN-GAT-RL'), nz(d.imageUrl));
   }
   listDetections(limit = 500) {
-    return this.db.prepare(`SELECT * FROM detections ORDER BY ts DESC LIMIT ?`).all(limit).map(r => ({
+    return this.db.prepare(`SELECT * FROM detections ORDER BY ts DESC, det_id DESC LIMIT ?`).all(limit).map(r => ({
       detId: r.det_id, ts: r.ts, deviceId: r.device_id, kind: r.kind, part: r.part,
       disease: r.disease, confidence: r.confidence,
       bbox: { x: r.bx, y: r.by, w: r.bw, h: r.bh },
@@ -266,7 +269,7 @@ export class Store {
     this.db.prepare(`UPDATE missions SET status=? WHERE mission_id=?`).run(status, missionId);
   }
   listMissions(limit = 200) {
-    return this.db.prepare(`SELECT * FROM missions ORDER BY created_at DESC LIMIT ?`).all(limit).map(r => this._missionRow(r));
+    return this.db.prepare(`SELECT * FROM missions ORDER BY created_at DESC, mission_id DESC LIMIT ?`).all(limit).map(r => this._missionRow(r));
   }
 
   /**
@@ -278,7 +281,7 @@ export class Store {
    */
   listMissionsByType(type, limit = 200) {
     return this.db.prepare(
-      `SELECT * FROM missions WHERE type=? ORDER BY created_at DESC LIMIT ?`)
+      `SELECT * FROM missions WHERE type=? ORDER BY created_at DESC, mission_id DESC LIMIT ?`)
       .all(type, limit).map(r => this._missionRow(r));
   }
 
@@ -317,7 +320,7 @@ export class Store {
         nz(e.latency.sense), nz(e.latency.dispatch), nz(e.latency.act), nz(e.latency.total), e.closed ? 1 : 0);
   }
   listLinkEvents(limit = 200) {
-    return this.db.prepare(`SELECT * FROM link_events ORDER BY ts DESC LIMIT ?`).all(limit).map(r => ({
+    return this.db.prepare(`SELECT * FROM link_events ORDER BY ts DESC, event_id DESC LIMIT ?`).all(limit).map(r => ({
       eventId: r.event_id, ts: r.ts,
       trigger: { deviceId: r.trigger_device, kind: r.trigger_kind, reason: r.reason },
       chain: JSON.parse(r.chain || '[]'),
@@ -427,8 +430,8 @@ export class Store {
   }
   listCommands(deviceId = null, limit = 200) {
     const rows = deviceId
-      ? this.db.prepare(`SELECT * FROM commands WHERE device_id=? ORDER BY issued_at DESC LIMIT ?`).all(deviceId, limit)
-      : this.db.prepare(`SELECT * FROM commands ORDER BY issued_at DESC LIMIT ?`).all(limit);
+      ? this.db.prepare(`SELECT * FROM commands WHERE device_id=? ORDER BY issued_at DESC, command_id DESC LIMIT ?`).all(deviceId, limit)
+      : this.db.prepare(`SELECT * FROM commands ORDER BY issued_at DESC, command_id DESC LIMIT ?`).all(limit);
     return rows.map(r => ({
       commandId: r.command_id, deviceId: r.device_id, tenantId: r.tenant_id,
       type: r.type, missionId: r.mission_id, payload: JSON.parse(r.payload || '{}'),
@@ -447,8 +450,8 @@ export class Store {
   }
   listUsage(tenantId = null, limit = 500) {
     const rows = tenantId
-      ? this.db.prepare(`SELECT * FROM usage_records WHERE tenant_id=? ORDER BY ts DESC LIMIT ?`).all(tenantId, limit)
-      : this.db.prepare(`SELECT * FROM usage_records ORDER BY ts DESC LIMIT ?`).all(limit);
+      ? this.db.prepare(`SELECT * FROM usage_records WHERE tenant_id=? ORDER BY ts DESC, id DESC LIMIT ?`).all(tenantId, limit)
+      : this.db.prepare(`SELECT * FROM usage_records ORDER BY ts DESC, id DESC LIMIT ?`).all(limit);
     return rows.map(r => ({
       ts: r.ts, tenantId: r.tenant_id, missionId: r.mission_id, type: r.type,
       areaMu: r.area_mu, volumeL: r.volume_l, minutes: r.minutes,

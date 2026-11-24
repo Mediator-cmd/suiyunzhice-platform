@@ -1,0 +1,40 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "suiyunzhice-platform",
+  "main": "cloud/src/index.js",
+  "compatibility_date": "2026-08-25",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // 自定义域名（需要 Cloudflare 托管 NS）
+  // 部署前把下面的 routes 换成实际域名即可启用。
+  "routes": [],
+
+  // 静态资源（前端产物）
+  "assets": {
+    "directory": "web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+
+  // Durable Object：持有 SQLite 状态 + WebSocket 广播
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "PLATFORM_STATE",
+        "class_name": "PlatformState"
+      }
+    ]
+  },
+
+  // 新建实例的迁移策略
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["PlatformState"]
+    }
+  ],
+
+  "observability": {
+    "enabled": true
+  }
+}
