@@ -17,6 +17,7 @@ import { LinkageEngine } from '../../shared/linkage.js';
 import { Simulator } from '../../shared/simulator.js';
 import { LinkStats } from '../../shared/linkstats.js';
 import { buildSprayMissions, buildRecheckMission } from '../../shared/spraydispatch.js';
+import { OFFICIAL_URL } from './platform-info.js';
 import {
   generateSprayRoute, solveSprayRatio, scoreRoute,
 } from '../../shared/planner.js';
@@ -45,8 +46,10 @@ import {
  *   · 同源部署（Cloudflare Worker）—— 直接用当前站点的 /api
  *   · GitHub Pages —— 指向云端 Worker
  * 后端不可达时前端会退回浏览器内引擎，功能依然完整。
+ *
+ * 地址与平台信息里的 OFFICIAL_URL 同源，避免两处各写一份而不一致。
  */
-const CLOUD_API_BASE = 'https://suiyunzhice-platform.3403775603.workers.dev';
+const CLOUD_API_BASE = OFFICIAL_URL;
 
 const API_BASE = (() => {
   if (import.meta.env.VITE_API_BASE) return import.meta.env.VITE_API_BASE;

@@ -23,10 +23,20 @@ export const TITLE = `${BRAND}——${BRAND_FULL}`;
 /**
  * 官方网站（公网访问地址）
  *
- * 纯静态部署在 GitHub Pages，前端与后端同源部署，
- * 因此链接指向站点根路径即可打开完整平台。
+ * 主地址是 Cloudflare Worker —— 前后端同源部署，
+ * 打开就是带真后端的完整平台（REST 接口 + WebSocket 实时通道）。
+ * GitHub Pages 版是同一套前端的静态托管副本，
+ * 前端会把 API 请求转发到主地址，功能完全一致，作为备用入口。
  */
-export const OFFICIAL_URL = 'https://mediator-cmd.github.io/suiyunzhice-platform/';
+export const OFFICIAL_URL = 'https://suiyunzhice-platform.3403775603.workers.dev';
+
+/**
+ * 备用入口（静态托管副本）。
+ *
+ * 用途：主地址不可达时（例如某些网络环境对 workers.dev 的解析有问题），
+ * 可以从这里进，页面仍会连到主地址取数。
+ */
+export const BACKUP_URL = 'https://mediator-cmd.github.io/suiyunzhice-platform/';
 
 /** 官网地址的纯文本形式（去掉协议尾斜杠，便于排版） */
 export const OFFICIAL_URL_TEXT = OFFICIAL_URL.replace(/^https?:\/\//, '').replace(/\/$/, '');
