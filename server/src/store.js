@@ -332,6 +332,24 @@ export class Store {
     }));
   }
 
+  /**
+   * 删除指定时刻之前的联动事件（一次性清理用）。
+   *
+   * 与 cloud/src/sqlite-store.js 同一语义：
+   * 清掉修复联动缺陷之前产生的、时延与闭环状态有误的事件，
+   * 让平台指标按正确口径重新累积。
+   * 播种的历史事件（LK-HIST- 前缀）不在清理范围内。
+   */
+  deleteLinkEventsBefore(beforeTs) {
+    const row = this.db.prepare(
+      `SELECT COUNT(*) AS n FROM link_events WHERE ts < ? AND event_id NOT LIKE 'LK-HIST-%'`
+    ).get(beforeTs);
+    this.db.prepare(
+      `DELETE FROM link_events WHERE ts < ? AND event_id NOT LIKE 'LK-HIST-%'`
+    ).run(beforeTs);
+    return row?.n ?? 0;
+  }
+
   // ---- 施药记录 ----
   insertSpray(s) {
     this.db.prepare(`INSERT INTO sprays

@@ -210,6 +210,29 @@ export class SqliteStore {
     const cutoff = Date.now() - keepMs;
     this.run(`DELETE FROM telemetry WHERE ts < ?`, cutoff);
   }
+
+  /**
+   * 删除指定时刻之前的联动事件（一次性清理用）。
+   *
+   * 用途：修复联动缺陷之前产生的联动事件，其时延与闭环状态是错的
+   * （执行段时延把排队等待算了进去、待闭环事件互相覆盖导致永远闭不上）。
+   * 这些事件会持续污染总览页的时延与闭环完成率，
+   * 所以在部署修复后需要把旧数据清掉，让新数据用正确的口径重新累积。
+   *
+   * 播种的历史事件（LK-HIST- 前缀）不在清理范围内 ——
+   * 它们由 shared/agroseed.js 确定性生成，数值本来就是对的。
+   *
+   * @param {number} beforeTs 只删除 ts 早于该时刻的事件
+   * @returns {number} 删除行数
+   */
+  deleteLinkEventsBefore(beforeTs) {
+    // DO 的 exec() 不返回受影响行数，先删再数还剩多少，
+    // 差值就是删除量（只对这一次性清理有意义）。
+    const before = this.all(`SELECT COUNT(*) AS n FROM link_events
+      WHERE ts < ? AND event_id NOT LIKE 'LK-HIST-%'`, beforeTs)[0]?.n ?? 0;
+    this.run(`DELETE FROM link_events WHERE ts < ? AND event_id NOT LIKE 'LK-HIST-%'`, beforeTs);
+    return before;
+  }
   recentTelemetry(limit = 200, deviceId = null) {
     // 与 server/src/store.js 同一条 SQL：取最近 N 条、按时间正序返回，
     // 并用 id 做第二排序键，避免同刻多帧的顺序在两端不一致。

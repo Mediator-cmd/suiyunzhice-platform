@@ -187,6 +187,18 @@ export class PlatformState {
       await this.state.storage.put('seeded', Date.now());
     }
 
+    // 一次性清理：修复联动缺陷之前产生的联动事件，其时延与闭环状态是错的
+    // （执行段时延把排队等待算了进去、待闭环事件互相覆盖导致永远闭不上）。
+    // 这些事件会持续污染总览页的时延与闭环完成率，
+    // 清掉之后让新数据按正确口径重新累积。
+    // 播种的历史事件（LK-HIST- 前缀）数值本来就是对的，不在清理范围内。
+    // 用持久化标记保证只清一次。
+    if (!await this.state.storage.get('linkagePurged')) {
+      const purged = this.store.deleteLinkEventsBefore(Date.now());
+      await this.state.storage.put('linkagePurged', Date.now());
+      if (purged) console.log(`[migrate] 已清理修复前的联动事件 ${purged} 条`);
+    }
+
     this.ready = true;
 
     // 启动内置模拟器：让云端真的有设备在跑
