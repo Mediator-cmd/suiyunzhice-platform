@@ -72,10 +72,13 @@ const hub = new RealtimeHub({
         uavDet: { ...d, deviceId: d.deviceId || 'UAV-01' },
         field: FIELD, planning: plan,
       });
-      broadcast('linkage', ev);
-      const mission = buildRecheckMission({ detection: d, field: FIELD });
-      store.insertMission(mission);
-      broadcast('mission', mission);
+      // ev 为 null 表示该网格已有未闭合的复核派单，无需重复派单
+      if (ev) {
+        broadcast('linkage', ev);
+        const mission = buildRecheckMission({ detection: d, field: FIELD });
+        store.insertMission(mission);
+        broadcast('mission', mission);
+      }
     }
     dispatchSprayIfNeeded();
   },
@@ -229,10 +232,13 @@ if (SIM) {
             uavDet: { ...d, deviceId: d.deviceId || 'UAV-01' },
             field: FIELD, planning: plan,
           });
-          broadcast('linkage', ev);
-          const mission = buildRecheckMission({ detection: d, field: FIELD });
-          store.insertMission(mission);
-          broadcast('mission', mission);
+          // ev 为 null 表示该网格已有未闭合的复核派单，无需重复派单
+          if (ev) {
+            broadcast('linkage', ev);
+            const mission = buildRecheckMission({ detection: d, field: FIELD });
+            store.insertMission(mission);
+            broadcast('mission', mission);
+          }
         }
         dispatchSprayIfNeeded();
       } catch (e) {

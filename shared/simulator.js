@@ -274,6 +274,13 @@ export class Simulator {
       // 等待派单
       if (this.pendingRechecks.length && Math.random() < 0.5) {
         r.target = this.pendingRechecks.shift();
+        // 该区块的「待复核」标记可以撤掉了：
+        // 这一单已被机器人领走，同区块再有新疑点会重新派单。
+        if (this.pendingRecheckKeys && r.target) {
+          const tr = Math.floor(r.target.geo.y / this.field.cellH);
+          const tc = Math.floor(r.target.geo.x / this.field.cellW);
+          this.pendingRecheckKeys.delete(`${Math.floor(tr / 3)}_${Math.floor(tc / 3)}`);
+        }
         r.state = DEVICE_STATES.RECHECKING;
       }
     } else if (r.state === DEVICE_STATES.RECHECKING) {
@@ -284,6 +291,8 @@ export class Simulator {
       if (d < 1.2) {
         r.state = DEVICE_STATES.SURVEYING;   // 到位，开始近距采集
         r.collectT = 0;
+        // 开始执行的时刻 —— 执行段时延从此刻算起，不含排队等待
+        r.target.startedAt = Date.now();
       } else {
         r.x += (dx / d) * r.spd * dt;
         r.y += (dy / d) * r.spd * dt;
@@ -347,7 +356,12 @@ export class Simulator {
   emitRobotDetection(r) {
     const t = r.target;
     const d = this.detectAt(t.geo.x, t.geo.y, t.part || 'underside', 'robot', t.disease);
-    if (d) this.onDetection(d);
+    if (d) {
+      // 把「机器人开始执行这一单的时刻」一并带上：
+      // 云端据此区分「排队等待」与「实际执行」，执行段时延只算后者。
+      d.recheckStartedAt = t.startedAt || Date.now();
+      this.onDetection(d);
+    }
   }
 
   detectAt(x, y, part, kind, forceDisease = null) {
@@ -360,6 +374,36 @@ export class Simulator {
     }
     // 距病灶越近，检出概率越高
     const prob = Math.max(0, best.strength - bestDist / 60);
+    //
+    // 地面复核**必须**出结果：
+    //   机器人是被「空中发现了疑似病斑」派过去的，
+    //   它到了目标点就是要看叶下/根茎 —— 这一趟必须有结论。
+    //   若这里还按概率随机失败，平台会看到
+    //   「派了单、机器人也到了、却什么都没回传」，
+    //   派单事件永远闭不上，闭环完成率被无谓地拉低 ——
+    //   这是平台自身的缺陷，不是真实的作业失败。
+    //   所以地面复核一律出结果；置信度按接近程度给，偏低即表示「仍不确定」。
+    if (kind === 'robot') {
+      // 近距复核：置信度高于空中判读（离得近、看得清）
+      const conf = +Math.min(0.99, 0.72 + best.strength * 0.2 + Math.random() * 0.06).toFixed(3);
+      const row = Math.min(this.field.gridRows - 1, Math.max(0, Math.floor(y / this.field.cellH)));
+      const col = Math.min(this.field.gridCols - 1, Math.max(0, Math.floor(x / this.field.cellW)));
+      const disease = forceDisease
+        || (['root_rot', 'fusarium'].includes(best.disease) ? best.disease : best.disease);
+      return {
+        detId: `D-${Date.now()}-${++this.detSeq}`,
+        ts: Date.now(),
+        deviceId: 'ROB-01',
+        kind: 'robot',
+        part: part || 'underside',
+        disease,
+        confidence: conf,
+        bbox: { x: 120 + Math.random() * 400, y: 90 + Math.random() * 300, w: 40 + Math.random() * 90, h: 40 + Math.random() * 90 },
+        geo: { x: +x.toFixed(2), y: +y.toFixed(2) },
+        grid: { row, col },
+        model: 'SAN-GAT-RL',
+      };
+    }
     if (Math.random() > prob) return null;
 
     const row = Math.min(this.field.gridRows - 1, Math.max(0, Math.floor(y / this.field.cellH)));
@@ -397,9 +441,24 @@ export class Simulator {
 
     // 需要近地复核 → 派单给机器人
     if (kind === 'uav' && (confidence < 0.75 || ['stem', 'underside', 'soil'].includes(effectivePart))) {
-      this.pendingRechecks.push({
-        detId: det.detId, geo: det.geo, disease: det.disease, part: effectivePart,
-      });
+      // 同一**区块**只保留一单待复核：
+      //   地面复核的作业范围本来就是目标格及其周边 3×3，
+      //   同一区块内重复派单是重复劳动 ——
+      //   会把机器人的复核队列撑爆，队列越长单越排不上，
+      //   闭环完成率反而被拖低。
+      //   区块步长与 shared/linkage.js 的 blockKey 一致（3）。
+      const key = `${Math.floor(row / 3)}_${Math.floor(col / 3)}`;
+      if (!this.pendingRecheckKeys) this.pendingRecheckKeys = new Set();
+      if (!this.pendingRecheckKeys.has(key)) {
+        this.pendingRecheckKeys.add(key);
+        this.pendingRechecks.push({
+          detId: det.detId, geo: det.geo, disease: det.disease, part: effectivePart,
+          // 派单时刻：机器人真正开始执行这一单的时刻要单独记，
+          // 否则「排队等待」会被算进「执行段时延」，
+          // 平台上的实时性指标就会把排队误读成执行慢。
+          dispatchedAt: Date.now(),
+        });
+      }
     }
     return det;
   }

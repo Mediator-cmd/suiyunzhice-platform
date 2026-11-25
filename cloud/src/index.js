@@ -161,6 +161,10 @@ export class PlatformState {
       store: this.store,
       onEvent: (e) => this.broadcast('linkage', e),
     });
+    // 重建待闭环队列：Durable Object 被驱逐后内存队列会丢，
+    // 而存储里的事件还标着「未闭环」——
+    // 不重建的话，这些事件永远等不到闭合证据，闭环完成率一路下滑。
+    this.linkage.restorePending(this.store.listLinkEvents(200));
     this.hub = new RealtimeHub({
       store: this.store,
       stats: this.stats,
@@ -366,10 +370,13 @@ export class PlatformState {
         uavDet: { ...d, deviceId: d.deviceId || 'UAV-01' },
         field: this.platform.field, planning: plan,
       });
-      this.broadcast('linkage', ev);
-      const mission = await this.buildRecheckMission(d);
-      this.store.insertMission(mission);
-      this.broadcast('mission', mission);
+      // ev 为 null 表示该网格已有未闭合的复核派单，无需重复派单
+      if (ev) {
+        this.broadcast('linkage', ev);
+        const mission = await this.buildRecheckMission(d);
+        this.store.insertMission(mission);
+        this.broadcast('mission', mission);
+      }
     }
     await this.dispatchSprayIfNeeded();
   }

@@ -159,10 +159,13 @@ class LocalEngine {
             uavDet: { ...d, deviceId: d.deviceId || 'UAV-01' },
             field: this.field, planning: plan,
           });
-          this.emit('linkage', ev);
-          const mission = buildRecheckMission({ detection: d, field: this.field });
-          this.store.insertMission(mission);
-          this.emit('mission', mission);
+          // ev 为 null 表示该网格已有未闭合的复核派单，无需重复派单
+          if (ev) {
+            this.emit('linkage', ev);
+            const mission = buildRecheckMission({ detection: d, field: this.field });
+            this.store.insertMission(mission);
+            this.emit('mission', mission);
+          }
         }
         // 确诊结果累积到一定密度 → 自动生成靶向施药作业单（省药闭环）
         this.maybeDispatchSpray();
