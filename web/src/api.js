@@ -43,6 +43,11 @@ import {
   buildOperationPlan, cellsInArea, confirmedCellsInArea,
   operationMode, directCommand, validateCommand,
 } from '../../shared/fleet.js';
+import { swarmPlan } from '../../shared/swarm.js';
+import {
+  BENCHMARKS, benchmarkCatalog, benchmarkNotice,
+} from '../../shared/benchmarks.js';
+import { currentWeather } from '../../shared/agronomy.js';
 
 /**
  * 云端后端地址。
@@ -558,6 +563,123 @@ class LocalEngine {
     return { modes: OPERATION_MODES, directCommands: DIRECT_COMMANDS, types: COMMAND_TYPES };
   }
 
+  /* ---- 算法内核（纯静态部署时的浏览器内实现） ---- */
+
+  /** 离线实验基准目录 —— 与服务端 /algo/benchmarks 同源 */
+  algoBenchmarks() {
+    return { notice: benchmarkNotice(), catalog: benchmarkCatalog() };
+  }
+
+  /** 单组离线实验基准 */
+  algoBenchmark(key) {
+    const b = BENCHMARKS[key];
+    if (!b) return null;
+    return { notice: benchmarkNotice(), key, benchmark: b };
+  }
+
+  /** 多机协同规划（浏览器内算，与服务端同算法） */
+  algoSwarmPlan(body = {}) {
+    const b = body || {};
+    const dets = this.store.listDetections(3000);
+    const confirmed = dets.filter(d => d.confidence >= 0.75);
+    const src = confirmed.length ? confirmed : dets;
+    const map = new Map();
+    for (const d of src) {
+      const key = `${d.grid.row}_${d.grid.col}`;
+      if (!map.has(key)) map.set(key, { row: d.grid.row, col: d.grid.col, severity: 0 });
+      const e = map.get(key);
+      e.severity = Math.max(e.severity, d.confidence);
+    }
+    const cells = Array.isArray(b.cells) ? b.cells : [...map.values()];
+    const hotspots = cells.slice(0, 20).map(c => ({
+      r: c.row, c: c.col, area: 25, severity: c.severity ?? 0.6,
+    }));
+    const w = currentWeather();
+    const result = swarmPlan(this.field, hotspots, {
+      nDrones: b.nDrones ?? 4,
+      windSpeed: b.windSpeed ?? w.wind ?? 3,
+      windDirDeg: b.windDirDeg ?? 45,
+      swathM: b.swathM ?? 1.0,
+      doseLha: b.doseLha ?? 12,
+      algo: b.algo ?? 'pso-aco',
+      seed: b.seed ?? 0,
+    });
+    if (!result.ok) return { ok: false, reason: result.reason };
+    return {
+      ...result,
+      source: {
+        cells: hotspots.length,
+        origin: Array.isArray(b.cells) ? '请求指定' : '平台已确认病害网格',
+        requestedBy: 'local-engine',
+        weather: { windSpeed: b.windSpeed ?? w.wind ?? 3, windDirDeg: b.windDirDeg ?? 45, simulated: true },
+      },
+    };
+  }
+
+  /** 五种分配算法对比（浏览器内算） */
+  algoSwarmCompare(body = {}) {
+    const b = body || {};
+    const dets = this.store.listDetections(3000);
+    const confirmed = dets.filter(d => d.confidence >= 0.75);
+    const src = confirmed.length ? confirmed : dets;
+    const map = new Map();
+    for (const d of src) {
+      const key = `${d.grid.row}_${d.grid.col}`;
+      if (!map.has(key)) map.set(key, { row: d.grid.row, col: d.grid.col, severity: 0 });
+      map.get(key).severity = Math.max(map.get(key).severity, d.confidence);
+    }
+    const hotspots = [...map.values()].sort((a, c) => c.severity - a.severity)
+      .slice(0, b.maxCells ?? 16)
+      .map(c => ({ r: c.row, c: c.col, area: 25, severity: c.severity }));
+    if (hotspots.length < 2) return { error: '可用病害格不足，无法做算法对比' };
+    const w = currentWeather();
+    const windSpeed = b.windSpeed ?? w.wind ?? 3;
+    const windDirDeg = b.windDirDeg ?? 45;
+    const NAMES = {
+      nearest: '最近邻均分', ga: '遗传算法 GA', pso: '粒子群 PSO',
+      aco: '蚁群 ACO', 'pso-aco': 'PSO-ACO 混合',
+    };
+    const rows = [];
+    for (const algo of ['nearest', 'ga', 'pso', 'aco', 'pso-aco']) {
+      const r = swarmPlan(this.field, hotspots, {
+        nDrones: b.nDrones ?? 4, windSpeed, windDirDeg,
+        swathM: b.swathM ?? 1.0, doseLha: b.doseLha ?? 12, algo, seed: b.seed ?? 0,
+      });
+      if (!r.ok) continue;
+      rows.push({
+        algo, name: NAMES[algo],
+        totalLengthM: r.metrics.totalLengthM,
+        totalMinutes: r.metrics.totalMinutes,
+        makespanMinutes: r.metrics.makespanMinutes,
+        energyWh: r.metrics.energyWh,
+        turns: r.metrics.turns,
+        coverage: r.metrics.coverage,
+        overRatio: r.metrics.overRatio,
+        overAreaHa: r.metrics.overAreaHa,
+        coveredAreaHa: r.metrics.coveredAreaHa,
+        targetAreaHa: r.metrics.targetAreaHa,
+        invalidCells: r.invalidCells?.length || 0,
+        minClearanceM: r.metrics.minClearanceM,
+        elapsedMs: r.elapsedMs,
+      });
+    }
+    const best = rows.find(r => r.algo === 'pso-aco');
+    for (const r of rows) {
+      r.gainVsPsoAco = best && r !== best ? {
+        length: +(((r.totalLengthM - best.totalLengthM) / Math.max(1, best.totalLengthM)) * 100).toFixed(1),
+        energy: +(((r.energyWh - best.energyWh) / Math.max(1, best.energyWh)) * 100).toFixed(1),
+        makespan: +(((r.makespanMinutes - best.makespanMinutes) / Math.max(1, best.makespanMinutes)) * 100).toFixed(1),
+      } : null;
+    }
+    return {
+      cells: hotspots.length, nDrones: b.nDrones ?? 4, wind: { windSpeed, windDirDeg }, rows,
+      notice: {
+        label: '平台实时计算',
+        desc: '以下结果由平台协同规划内核在当前病害网格与实时风场下现场算出，与「离线实验基准」相互独立。',
+      },
+    };
+  }
+
   /** 作业范围预览（只算不下发） */
   fleetPlan(body) {
     const b = body || {};
@@ -804,6 +926,20 @@ export const api = {
   /** 农户服务消息（公众号 / 小程序推送内容） */
   farmerMessages: () =>
     withFallback(() => get('/farmer/messages'), () => getLocalEngine().farmerMessages()),
+
+  /* ---- 算法内核 ---- */
+  /** 离线实验基准目录 */
+  algoBenchmarks: () =>
+    withFallback(() => get('/algo/benchmarks'), () => getLocalEngine().algoBenchmarks()),
+  /** 单组离线实验基准 */
+  algoBenchmark: (key) =>
+    withFallback(() => get(`/algo/benchmarks/${key}`), () => getLocalEngine().algoBenchmark(key)),
+  /** 多机协同规划 */
+  algoSwarmPlan: (body) =>
+    withFallback(() => post('/algo/swarm/plan', body), () => getLocalEngine().algoSwarmPlan(body)),
+  /** 五种分配算法对比 */
+  algoSwarmCompare: (body) =>
+    withFallback(() => post('/algo/swarm/compare', body), () => getLocalEngine().algoSwarmCompare(body)),
 
   /* ---- 装备操控 ---- */
   /** 作业方式与直接指令目录 */

@@ -2,62 +2,49 @@ import { chromium } from 'playwright-core';
 import { mkdirSync } from 'node:fs';
 
 /**
- * 平台底座三页的渲染自检
+ * 抓取「平台底座」四个新页面的实拍图（公网真后端）。
  *
- * 用法：
- *   node deploy/_shot_base.mjs http://localhost:8130   # 有后端（真实接口）
- *   node deploy/_shot_base.mjs http://localhost:4173   # 无后端（演示模式降级）
- *
- * 两种模式都要能正常渲染 —— 这是平台「两种环境数字口径一致」约定的延伸：
- * 底座页面在纯静态托管下也必须可用。
+ * 用法：node _shot_base.mjs <baseUrl> <outDir>
+ * 视口 1600x1000 @2x。
  */
 
-const BASE = process.argv[2] || 'http://localhost:4173';
+const BASE = process.argv[2] || 'https://suiyunzhice-platform.3403775603.workers.dev';
+const OUT = process.argv[3] || 'C:/temp/lx6/shots';
 const EXE = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
-const OUT = 'C:/Users/ASUS/_shots';
 mkdirSync(OUT, { recursive: true });
 
 const PAGES = [
-  ['tenancy',   '租户与权限'],
-  ['access',    '设备接入'],
-  ['developers','开发者门户'],
-  ['metering',  '计量结算'],
+  ['tenancy',    '租户与权限', 'book_tenancy'],
+  ['access',     '设备接入',   'book_access'],
+  ['developers', '开发者门户', 'book_developers'],
+  ['farm',       '农户服务',   'book_farm'],
+  ['mobile',     '三端联动',   'book_mobile'],
+  ['analytics',  '数据分析',   'book_analytics'],
+  ['arch',       '系统架构',   'book_arch'],
 ];
 
 const browser = await chromium.launch({ executablePath: EXE });
-const ctx = await browser.newContext({ viewport: { width: 1680, height: 1050 } });
+const ctx = await browser.newContext({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 2 });
 const page = await ctx.newPage();
 
 const errors = [];
-page.on('console', m => { if (m.type() === 'error') errors.push(`[console] ${m.text()}`); });
-page.on('pageerror', e => errors.push(`[pageerror] ${e.message}`));
+page.on('console', m => { if (m.type() === 'error' && !/favicon/i.test(m.text())) errors.push(m.text()); });
+page.on('pageerror', e => errors.push(e.message));
 
-const log = [];
-await page.goto(`${BASE}/`, { waitUntil: 'load', timeout: 45000 });
-await page.waitForTimeout(6000);
+await page.goto(`${BASE}/`, { waitUntil: 'load', timeout: 60000 });
+await page.waitForTimeout(12000);
 
-for (const [key, label] of PAGES) {
-  try {
-    await page.locator('.nav button', { hasText: label }).first().click({ timeout: 8000 });
-    await page.waitForTimeout(2500);
-    await page.screenshot({ path: `${OUT}/base-${key}.png`, fullPage: true });
-    const txt = (await page.locator('main').innerText()).replace(/\s+/g, ' ').slice(0, 260);
-    log.push(`OK   ${key} (${label}) :: ${txt}`);
-  } catch (e) {
-    log.push(`FAIL ${key} (${label}) :: ${e.message}`);
-  }
+const chip = await page.locator('.modechip').first().innerText().catch(() => '(无 modechip)');
+console.log('modechip:', chip.replace(/\s+/g, ' ').trim());
+
+for (const [id, label, out] of PAGES) {
+  const btn = page.locator('.nav button', { hasText: label }).first();
+  if (!(await btn.count())) { console.log(`${label} FAIL — 导航项找不到`); continue; }
+  await btn.click();
+  await page.waitForTimeout(3500);
+  await page.screenshot({ path: `${OUT}/${out}.png`, fullPage: false });
+  console.log(`${label} -> ${out}.png`);
 }
 
-// 侧边栏身份徽标
-try {
-  const badge = await page.locator('.side-foot .badge').allInnerTexts();
-  log.push(`side-foot badges :: ${badge.map(s => s.replace(/\s+/g, ' ').trim()).join(' | ')}`);
-} catch (e) {
-  log.push(`badge FAIL :: ${e.message}`);
-}
-
-log.push('--- console errors ---');
-log.push(errors.length ? errors.slice(0, 30).join('\n') : '(none)');
-
+console.log('console errors:', errors.length ? errors.slice(0, 5) : 'none');
 await browser.close();
-console.log(log.join('\n'));

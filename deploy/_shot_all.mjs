@@ -25,6 +25,7 @@ const PAGES = [
   ['analytics',  '数据分析'],
   ['agro',       '农情策略'],
   ['planner',    '路径规划'],
+  ['algorithms', '算法基准'],
   ['planning',   '平台方案'],
   ['tenancy',    '租户与权限'],
   ['access',     '设备接入'],

@@ -1180,3 +1180,128 @@ select.inp { min-width: 160px; flex: 0 0 auto; }
   padding: 10px 16px; font-size: 13px; color: var(--text-mute);
   border-top: 1px solid var(--border); background: var(--panel-2);
 }
+
+/* =====================================================================
+ * 算法基准页专用样式
+ * ===================================================================== */
+
+/* 页签 */
+.tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+.tabs .tab {
+  appearance: none;
+  border: 1px solid transparent;
+  border-bottom: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  position: relative;
+  top: 1px;
+}
+.tabs .tab:hover { color: var(--text); background: var(--bg); }
+.tabs .tab.on {
+  color: var(--accent);
+  background: var(--panel);
+  border-color: var(--border);
+  border-bottom: 1px solid var(--panel);
+}
+.tabs.small .tab { font-size: 13px; padding: 5px 10px; }
+
+/* 口径提示条 —— 离线基准与平台实时计算必须分开标注 */
+.notice-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--text-dim);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 12px;
+  margin-bottom: 16px;
+}
+.notice-line .src { margin-left: auto; font-size: 12px; color: var(--text-mute); }
+
+/* 小标题（图表上方） */
+.sub-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin: 12px 0 6px;
+}
+
+/* 结论段 —— 每块数据的「所以呢」 */
+.conclusion {
+  margin: 12px 0 0;
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--text-dim);
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 10px 12px;
+}
+.conclusion b { color: var(--text); }
+
+/* 注意事项（数据缺口等） */
+.warn-line {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--warn);
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-line);
+  border-radius: 8px;
+  padding: 8px 11px;
+}
+
+/* 表格加粗行 */
+.tbl tr.strong td { font-weight: 700; color: var(--text); background: var(--accent-soft); }
+
+/* 参数控件行 */
+.ctrl-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.ctrl-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+.ctrl-row label b { color: var(--text); font-size: 13px; }
+.ctrl-row input[type='range'] { width: 150px; accent-color: var(--accent); }
+.ctrl-row select {
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+}
+
+/* 要点列表 */
+.bullets {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--text-dim);
+}
+.bullets li { margin-bottom: 6px; }
+.bullets b { color: var(--text); }

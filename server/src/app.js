@@ -49,6 +49,10 @@ import {
   operationMode, directCommand, validateCommand,
   buildOperationPlan, cellsInArea, confirmedCellsInArea,
 } from '../../shared/fleet.js';
+import { swarmPlan } from '../../shared/swarm.js';
+import {
+  BENCHMARKS, benchmarkCatalog, benchmarkNotice,
+} from '../../shared/benchmarks.js';
 
 /**
  * 创建 API 路由表。
@@ -942,6 +946,177 @@ export function createApiRouter(deps) {
     rec.amount = priced.total;
     store.insertUsage(rec);
     res.json({ ok: true, usage: rec, priced });
+  });
+
+  /* ================================================================
+   * 算法内核 —— 把队友交付的研究算法接进平台
+   *
+   * 这一组接口把原先只存在于申报材料里的算法能力变成**可查询、可调用**：
+   *   · /algo/benchmarks      离线实验基准（检测/规划/融合/喷洒四组）
+   *   · /algo/benchmarks/:key 取单组基准的完整数据
+   *   · /algo/swarm/plan      多机协同规划（现场算，含风场与障碍约束）
+   *   · /algo/swarm/compare   五种分配算法在同一批病灶上的对比
+   *
+   * 口径纪律：离线基准与平台实时数据是两套东西，接口里用 notice 标明，
+   * 前端也必须分别标注，不许混着说。
+   * ================================================================ */
+
+  api.get('/algo/benchmarks', (req, res) => {
+    res.json({
+      notice: benchmarkNotice(),
+      catalog: benchmarkCatalog(),
+    });
+  });
+
+  api.get('/algo/benchmarks/:key', (req, res) => {
+    const b = BENCHMARKS[req.params.key];
+    if (!b) {
+      return res.status(404).json({
+        error: '基准不存在',
+        available: Object.keys(BENCHMARKS),
+      });
+    }
+    res.json({ notice: benchmarkNotice(), key: req.params.key, benchmark: b });
+  });
+
+  /**
+   * 多机协同规划：病灶格 → 多机分工 + 绕障航线 + 风偏代价。
+   *
+   * 病灶来源两种：
+   *   ① 默认取平台已确认的病害网格（置信度 ≥ 0.75），与平台既有口径一致；
+   *   ② 请求里给 cells 则用请求的（供答辩现场做对照实验）。
+   */
+  api.post('/algo/swarm/plan', (req, res) => {
+    const b = req.body || {};
+    const identity = resolveIdentity(req);
+
+    // 病灶格
+    let cells = Array.isArray(b.cells) ? b.cells : null;
+    if (!cells) {
+      const dets = store.listDetections(3000);
+      const confirmed = dets.filter(d => d.confidence >= 0.75);
+      const src = confirmed.length ? confirmed : dets;
+      const map = new Map();
+      for (const d of src) {
+        const key = `${d.grid.row}_${d.grid.col}`;
+        if (!map.has(key)) map.set(key, { row: d.grid.row, col: d.grid.col, n: 0, severity: 0 });
+        const e = map.get(key);
+        e.n++;
+        e.severity = Math.max(e.severity, d.confidence);
+      }
+      cells = [...map.values()].sort((a, b2) => b2.n - a.n).slice(0, 20);
+    }
+
+    const hotspots = cells.map(c => ({
+      r: c.row, c: c.col,
+      area: 25,
+      severity: c.severity ?? 0.6,
+    }));
+
+    // 风场：默认用平台实时气象（施药适宜度判定同源），也可用请求覆盖
+    const weather = currentWeather();
+    const windSpeed = b.windSpeed ?? weather.wind ?? 3;
+    const windDirDeg = b.windDirDeg ?? 45;
+
+    const result = swarmPlan(FIELD, hotspots, {
+      nDrones: b.nDrones ?? 4,
+      windSpeed,
+      windDirDeg,
+      swathM: b.swathM ?? 1.0,
+      transitSpeedMs: b.transitSpeedMs ?? 8.0,
+      spraySpeedMs: b.spraySpeedMs ?? 4.5,
+      doseLha: b.doseLha ?? 12,
+      algo: b.algo ?? 'pso-aco',
+      seed: b.seed ?? 0,
+    });
+
+    if (!result.ok) {
+      return res.status(400).json({ error: result.reason, reason: result.reason });
+    }
+    res.json({
+      ...result,
+      source: {
+        cells: hotspots.length,
+        origin: Array.isArray(b.cells) ? '请求指定' : '平台已确认病害网格',
+        requestedBy: identity.userId,
+        weather: { windSpeed, windDirDeg, simulated: true },
+      },
+    });
+  });
+
+  /** 五种分配算法在同一批病灶上的对比（现场算，答辩现场可现场展示） */
+  api.post('/algo/swarm/compare', (req, res) => {
+    const b = req.body || {};
+    const dets = store.listDetections(3000);
+    const confirmed = dets.filter(d => d.confidence >= 0.75);
+    const src = confirmed.length ? confirmed : dets;
+    const map = new Map();
+    for (const d of src) {
+      const key = `${d.grid.row}_${d.grid.col}`;
+      if (!map.has(key)) map.set(key, { row: d.grid.row, col: d.grid.col, severity: 0 });
+      map.get(key).severity = Math.max(map.get(key).severity, d.confidence);
+    }
+    const hotspots = [...map.values()].sort((a, c) => c.severity - a.severity)
+      .slice(0, b.maxCells ?? 16)
+      .map(c => ({ r: c.row, c: c.col, area: 25, severity: c.severity }));
+
+    if (hotspots.length < 2) {
+      return res.status(400).json({ error: '可用病害格不足，无法做算法对比' });
+    }
+
+    const weather = currentWeather();
+    const windSpeed = b.windSpeed ?? weather.wind ?? 3;
+    const windDirDeg = b.windDirDeg ?? 45;
+    const algos = ['nearest', 'ga', 'pso', 'aco', 'pso-aco'];
+    const rows = [];
+    for (const algo of algos) {
+      const r = swarmPlan(FIELD, hotspots, {
+        nDrones: b.nDrones ?? 4, windSpeed, windDirDeg,
+        swathM: b.swathM ?? 1.0, doseLha: b.doseLha ?? 12,
+        algo, seed: b.seed ?? 0,
+      });
+      if (!r.ok) continue;
+      rows.push({
+        algo,
+        name: {
+          nearest: '最近邻均分', ga: '遗传算法 GA', pso: '粒子群 PSO',
+          aco: '蚁群 ACO', 'pso-aco': 'PSO-ACO 混合',
+        }[algo],
+        totalLengthM: r.metrics.totalLengthM,
+        totalMinutes: r.metrics.totalMinutes,
+        makespanMinutes: r.metrics.makespanMinutes,
+        energyWh: r.metrics.energyWh,
+        turns: r.metrics.turns,
+        coverage: r.metrics.coverage,
+        overRatio: r.metrics.overRatio,
+        overAreaHa: r.metrics.overAreaHa,
+        coveredAreaHa: r.metrics.coveredAreaHa,
+        targetAreaHa: r.metrics.targetAreaHa,
+        invalidCells: r.invalidCells?.length || 0,
+        minClearanceM: r.metrics.minClearanceM,
+        elapsedMs: r.elapsedMs,
+      });
+    }
+    // 以 PSO-ACO 为基准算相对增益
+    const best = rows.find(r => r.algo === 'pso-aco');
+    for (const r of rows) {
+      r.gainVsPsoAco = best && r !== best ? {
+        length: +(((r.totalLengthM - best.totalLengthM) / Math.max(1, best.totalLengthM)) * 100).toFixed(1),
+        energy: +(((r.energyWh - best.energyWh) / Math.max(1, best.energyWh)) * 100).toFixed(1),
+        makespan: +(((r.makespanMinutes - best.makespanMinutes) / Math.max(1, best.makespanMinutes)) * 100).toFixed(1),
+      } : null;
+    }
+    res.json({
+      cells: hotspots.length,
+      nDrones: b.nDrones ?? 4,
+      wind: { windSpeed, windDirDeg },
+      rows,
+      notice: {
+        label: '平台实时计算',
+        desc: '以下结果由平台协同规划内核在当前病害网格与实时风场下现场算出，'
+          + '与「离线实验基准」相互独立。',
+      },
+    });
   });
 
   return api;

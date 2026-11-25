@@ -218,6 +218,9 @@ async function main() {
     '/tenancy/identity', '/tenancy/tenants', '/fields',
     '/access/devices', '/access/commands', '/metering/invoices', '/metering/metrics',
     '/platform/services', '/farmer/messages', '/openapi/stats', '/link/metrics',
+    // 算法内核接口（新增）
+    '/algo/benchmarks', '/algo/benchmarks/detection', '/algo/benchmarks/planning',
+    '/algo/benchmarks/fusion', '/algo/benchmarks/spray',
   ];
   let ifaceDiff = 0;
   for (const p of PATHS) {
@@ -231,6 +234,29 @@ async function main() {
     if (!ok) { ifaceDiff++; console.log(`  ✗ ${p} status=${res.statusCode} body=${String(res.body).slice(0, 80)}`); }
   }
   console.log(`  ${PATHS.length} 个接口，${ifaceDiff} 个异常`);
+  diff += ifaceDiff;
+
+  // POST 接口：算法内核（协同规划 / 算法对比）
+  const POSTS = [
+    ['/algo/swarm/plan', { nDrones: 4, algo: 'pso-aco' }],
+    ['/algo/swarm/compare', { nDrones: 4 }],
+  ];
+  for (const [p, body] of POSTS) {
+    const req = new MiniRequest({
+      method: 'POST', url: p, headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const res = await mini.handle(req);
+    let parsed = null;
+    try { parsed = JSON.parse(res.body); } catch { /* keep */ }
+    const ok = res.statusCode === 200 && parsed && typeof parsed === 'object';
+    if (!ok) {
+      ifaceDiff++; console.log(`  ✗ POST ${p} status=${res.statusCode}`);
+    } else if (p === '/algo/swarm/plan' && parsed.ok) {
+      console.log(`  ✓ POST ${p} → 航程 ${parsed.metrics.totalLengthM} m / 覆盖 ${parsed.metrics.coverage}`);
+    }
+  }
+  console.log(`  ${POSTS.length} 个 POST 接口，${ifaceDiff} 个异常`);
   diff += ifaceDiff;
 
   console.log('\n=== 4. 关键数字抽查（云端口径 vs 本机口径）===');
