@@ -370,6 +370,10 @@ export class PlatformState {
 
   /** 检测结果处理：联动闭环 + 派单 */
   async onDetection(d) {
+    // 落库：检测结果必须先存下来，
+    // 否则六维统计、总览 KPI 与「数据分析」页在云端都是空的
+    // （此前只广播不落库，本机版与浏览器版都存，两端口径不一致）。
+    this.store.insertDetection(d);
     this.broadcast('detection', d);
     if (d.kind === 'robot') {
       const closedEv = this.linkage.completeCycle(d);
