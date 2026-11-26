@@ -10,6 +10,7 @@
 
 import { DISEASES, ANALYTICS_DIMENSIONS } from './schema.js';
 import { autoPlan } from './planner.js';
+import { DETECTION_BENCHMARK } from './benchmarks.js';
 
 export class Analytics {
   constructor(store, field = null) {
@@ -366,6 +367,11 @@ export class Analytics {
   /** 农户信息面板：把统计翻译成"今天该做什么" */
   farmerBriefing() {
     const ov = this.overview();
+    // 背景误检率取自离线检测基准（改进模型测试集）——
+    // 不再硬编码一个没有出处的百分数，页面上的每个数都要能追到来源。
+    const detBench = DETECTION_BENCHMARK;
+    const fpRateP = (detBench.macro?.test?.improvedP) ?? 0;
+    const fpRate = 1 - fpRateP;
     const sprayMissions = this.store.listMissionsByType
       ? this.store.listMissionsByType('spray', 500)
       : this.store.listMissions(500);
@@ -412,7 +418,11 @@ export class Analytics {
       headline: `当前全场检出 ${ov.detection.total} 处疑似病斑，确认 ${ov.detection.confirmed} 处，待派单 ${ov.mission.pending} 单`,
       kpis: [
         { label: '平均识别置信度', value: `${(ov.detection.avgConfidence * 100).toFixed(1)}%`, sub: `模型对本次判定的自评分，非准确率` },
-        { label: '误检率', value: '6.0%', sub: '计划书实测口径' },
+        {
+          label: '背景误检率',
+          value: `${(100 * fpRate).toFixed(1)}%`,
+          sub: `改进模型测试集精确率 ${(fpRateP * 100).toFixed(1)}%（离线基准，非现场统计）`,
+        },
         { label: '联动闭环平均时延', value: `${(ov.linkage.avgLatencyMs / 1000).toFixed(1)} s`, sub: `P95 ${(ov.linkage.p95LatencyMs / 1000).toFixed(1)} s` },
         { label: '药液节约率', value: ov.efficiency.savedRatio == null ? '待作业' : `${ov.efficiency.savedRatio}%`, sub: ov.efficiency.savedRatio == null ? '尚无喷洒任务' : `累计节约 ${ov.efficiency.savedVolumeL} L` },
       ],
