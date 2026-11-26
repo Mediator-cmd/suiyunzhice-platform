@@ -524,6 +524,45 @@ function PlanningBench({ bench, notice }) {
         </div>
       </div>
 
+      {/*
+        按地形分类的能耗降幅 + 统计检验。
+        这两块是「问到底」时的答案：
+          · 14% 不是普遍结论 —— 收益主要来自平坦地块，梯田几乎无差别
+          · ACO 单独与混合算法统计上不可区分 —— 收益全部来自排序阶段
+        提前摆在明面上，比被追问后再解释更可信。
+      */}
+      {bench.energyDropByTerrain && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <h3>
+            收益高度依赖地形
+            <span className="tag">平均能耗降幅（相对最近邻基线）</span>
+          </h3>
+          <p className="hint">
+            梯田的陡坎把飞机限制在走廊之间，各规划器被挤进同一串航段，
+            排序几乎没有腾挪空间。所以「省 14%」必须带上这个前提。
+          </p>
+          <div className="grid g3" style={{ marginTop: 10 }}>
+            {bench.energyDropByTerrain.map(t => (
+              <div className="kpi" key={t.terrain}>
+                <span className="label">{t.terrain}</span>
+                <span className={`value ${t.drop >= 0.1 ? 'green' : 'blue'}`}>
+                  ↓ {(t.drop * 100).toFixed(0)}%
+                </span>
+                <span className="sub">{t.note}</span>
+              </div>
+            ))}
+          </div>
+          {bench.statistics && (
+            <p className="conclusion">
+              统计检验：能耗降幅对最近邻基线的 Wilcoxon 符号秩检验 p = {bench.statistics.wilcoxonP}
+              （显著）。但 ACO 单独与混合算法的对比 p = 0.284，
+              即两者统计上不可区分 —— 本问题里分配与排序并不独立，
+              蚁群在建巡回时已经顺带均衡了负载，两阶段分解暂未带来可测增益。
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="card" style={{ marginBottom: 16 }}>
         <h3>五种任务分配算法对照（{bench.fields} 个地块均值）</h3>
         <p className="hint">{bench.desc}</p>
