@@ -65,7 +65,7 @@ export default function Planner({ meta }) {
       </div>
 
       {/*
-        论文图 12 与图 13：规划器的对照实验。
+        实验图 12 与图 13：规划器的对照实验。
         图 12 是三种地形下「最近邻 A*」与「PSO-ACO 混合算法」的航迹对比；
         图 13 是 18 个地块上能耗 / 时长 / 航程 / 转弯四项指标的箱线图。
         两者都是离线实验基准（18 块仿真地块），与本页的实时规划结果口径独立，
@@ -73,7 +73,7 @@ export default function Planner({ meta }) {
       */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="sub-title">
-          <span className="chip">论文 图 12</span>
+          <span className="chip">实验图 12</span>
           航迹对比：最近邻 A* 与 PSO-ACO
           <span className="tag">离线实验基准</span>
         </div>
@@ -92,7 +92,7 @@ export default function Planner({ meta }) {
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="sub-title">
-          <span className="chip">论文 图 13</span>
+          <span className="chip">实验图 13</span>
           18 个地块的指标箱线图
           <span className="tag">离线实验基准</span>
         </div>
@@ -111,7 +111,7 @@ export default function Planner({ meta }) {
           18 块仿真地块的均值：总航程 2084 → 1794 m（↓14%），
           作业时长 13.5 → 11.5 min（↓15%），能耗 1968 → 1674 Wh（↓15%），
           转弯次数 198 → 164（↓17%）。混合算法在时长与航程上最优。
-          论文对能耗降幅做了 Wilcoxon 符号秩检验（p = 0.018）。
+          能耗降幅的 Wilcoxon 符号秩检验 p = 0.018（显著）。
         </p>
       </div>
 

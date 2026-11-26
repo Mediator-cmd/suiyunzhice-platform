@@ -26,7 +26,7 @@ const TABS = [
   { key: 'fusion', label: '多传感器融合' },
   { key: 'spray', label: '施药与沉积' },
   { key: 'live', label: '平台实时计算' },
-  { key: 'figures', label: '论文图集' },
+  { key: 'figures', label: '实验图集' },
 ];
 
 const pct = (v, d = 1) => (v == null ? '—' : `${(v * 100).toFixed(d)}%`);
@@ -95,7 +95,7 @@ function BenchView({ bench, notice }) {
 }
 
 /* =====================================================================
- * 论文图集
+ * 实验图集
  * ===================================================================== */
 
 /** 图 → 承载其数字的标签页（图只是可视化，结论在数据里） */
@@ -109,7 +109,7 @@ const FIGURE_DATA_TAB = {
   terrain: 'detection',
 };
 
-/** 一组论文图（图号 + 标题 + 图 + 图注），供各数据页内嵌 */
+/** 一组实验图（图号 + 标题 + 图 + 图注），供各数据页内嵌 */
 function PaperFigureGroup({ ids, columns = 2 }) {
   return (
     <div className="grid g2">
@@ -156,7 +156,7 @@ function FiguresView({ onPick }) {
   return (
     <div>
       <div className="notice-line">
-        <span className="chip mute">论文实验图集</span>
+        <span className="chip mute">实验图集</span>
         <span>
           队友交付的 18 张矢量图（matplotlib 生成），已转 WebP 静态托管。
           图是数据的可视化 —— 每张图对应的数字在下方标注的数据页里，
@@ -271,7 +271,7 @@ function DetectionBench({ bench, notice }) {
 
       <div style={{ marginBottom: 16 }}>
         <div className="sub-title" style={{ marginBottom: 10 }}>
-          <span className="chip">论文原图</span>
+          <span className="chip">实验原图</span>
           网络结构 · 训练收敛 · 混淆矩阵 · 分布偏移
           <span className="tag">与下方数据同源</span>
         </div>

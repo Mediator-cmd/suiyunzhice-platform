@@ -159,7 +159,7 @@ export const PLANNING_BENCHMARK = {
   fields: 18,
   terrainClasses: ['平坦', '梯田', '复杂'],
   /**
-   * 按地形分类的平均能耗降幅（相对最近邻基线）—— 来自论文正文，
+   * 按地形分类的平均能耗降幅（相对最近邻基线）—— 来自实验记录，
    * 原始 JSON 只存了逐地块结果，没有分地形汇总。
    *
    * 这组数字很重要：它说明「省 14%」不是普遍结论，
@@ -171,7 +171,7 @@ export const PLANNING_BENCHMARK = {
     { terrain: '复杂地形', drop: 0.04, note: '航线有差异，但障碍场限制了可省的量' },
     { terrain: '梯田', drop: 0.01, note: '陡坎之间的走廊把顺序基本定死' },
   ],
-  /** 统计检验（论文正文，原始 JSON 未记录） */
+  /** 统计检验（实验记录，原始 JSON 未记录） */
   statistics: {
     wilcoxonP: 0.018,
     note: '混合算法能耗降幅对最近邻基线的 Wilcoxon 符号秩检验；'
@@ -192,7 +192,7 @@ export const PLANNING_BENCHMARK = {
     { id: 'pso_aco', name: 'PSO-ACO 混合（本文）', length_sum: 1814, time_sum: 696, makespan: 215, energy_Wh: 1692, turns: 165, coverage: 0.957, overspray: 0.693 },
   ],
   /**
-   * 结论 —— 按论文原文的口径写，不做美化。
+   * 结论 —— 按实验记录的口径写，不做美化。
    *
    * 混合算法（PSO 分配 + ACO 排序）相对最近邻基线：
    *   能耗 1968 → 1692 Wh（↓14.0%，Wilcoxon 符号秩检验 p = 0.018）
@@ -202,7 +202,7 @@ export const PLANNING_BENCHMARK = {
    *
    * 但有一件事必须如实说明，否则一问就穿：
    * **ACO 单独使用在航程、时长、能耗三项上与混合算法统计上不可区分**（p = 0.284）。
-   * 论文的解释是：本问题里分配与排序并不独立 ——
+   * 实验的解释是：本问题里分配与排序并不独立 ——
    * 一架机内部 visiting order 决定了它的巡回长度，
    * 所以蚁群在建巡回的过程中就已经把负载均衡掉了。
    * 因此两阶段分解在本问题上没有带来可测增益，

@@ -79,7 +79,7 @@ export default function Linkage({ meta, devices, detections, events, overview, c
       </div>
 
       {/*
-        论文图 11：定位精度与脱靶率的三联图。
+        实验图 11：定位精度与脱靶率的三联图。
         这是「空地互补」在定位层面的实验依据 ——
         空中 GNSS 单点定位误差大（P95 偏移 2.94 m），
         地面机器人近距复核 + 融合定位把脱靶率从 40.3% 压到 0.0005%。
@@ -87,7 +87,7 @@ export default function Linkage({ meta, devices, detections, events, overview, c
       */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="sub-title">
-          <span className="chip">论文 图 11</span>
+          <span className="chip">实验图 11</span>
           定位精度与脱靶率
           <span className="tag">离线实验基准</span>
         </div>

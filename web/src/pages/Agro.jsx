@@ -55,13 +55,13 @@ export default function Agro({ detections, missions, meta, caseId, selectCase, o
       </div>
 
       {/*
-        论文图 15 / 16 / 18：施药侧的实验支撑。
+        实验图 15 / 16 / 18：施药侧的实验支撑。
         图 15 雾滴漂移（靶区命中率随风速下降）、图 16 变量施药率剂量分配、
         图 18 闭环反馈四阶段补偿。都是离线实验基准，与本页实况数据口径独立。
       */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="sub-title">
-          <span className="chip">论文 图 15</span>
+          <span className="chip">实验图 15</span>
           雾滴漂移特性
           <span className="tag">离线实验基准</span>
         </div>
@@ -85,7 +85,7 @@ export default function Agro({ detections, missions, meta, caseId, selectCase, o
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="sub-title">
-          <span className="chip">论文 图 16</span>
+          <span className="chip">实验图 16</span>
           变量施药率（VRA）剂量分配
           <span className="tag">离线实验基准</span>
         </div>
@@ -110,7 +110,7 @@ export default function Agro({ detections, missions, meta, caseId, selectCase, o
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="sub-title">
-          <span className="chip">论文 图 18</span>
+          <span className="chip">实验图 18</span>
           闭环反馈四阶段补偿
           <span className="tag">离线实验基准</span>
         </div>
