@@ -67,12 +67,22 @@ export class Simulator {
     this.execSpeedFactor = 1;
 
     // 病害分布：几个病灶中心
-    this.hotspots = [
+    //
+    // 纪律：**病灶中心必须落在可作业区**，且 5×5 邻域内不得有障碍。
+    //
+    // 之前 (3,31) 落在「灌溉水渠」里、(15,8) 紧贴「地头房舍」，
+    // 检测在障碍格上照样报出病害 —— 物理上荒谬（病害长在水渠里？），
+    // 实务上更糟：那些格飞不进去，协同规划只能把它们剔除，
+    // 云端实测每次规划有 5 个「非法格」被丢掉，答辩现场像是在漏作业。
+    //
+    // 修法：位置选在空地，并用 relocateHotspots() 兜底 ——
+    // 以后改障碍配置也不必再手工核这一遍。
+    this.hotspots = this.relocateHotspots([
       { row: 6, col: 12, strength: 0.9 },
       { row: 11, col: 24, strength: 0.7 },
       { row: 15, col: 8, strength: 0.5 },
       { row: 3, col: 31, strength: 0.45 },
-    ];
+    ]);
 
     this.uav = {
       deviceId: 'UAV-01', name: '植保无人机 · 麦田一号',
@@ -362,6 +372,53 @@ export class Simulator {
       d.recheckStartedAt = t.startedAt || Date.now();
       this.onDetection(d);
     }
+  }
+
+  /**
+   * 病灶中心合法性检查与就近挪移。
+   *
+   * 判据（两条都要满足）：
+   *   ① 中心格本身不落在障碍上；
+   *   ② 中心周围 5×5 邻域内没有障碍格 ——
+   *      因为检出是按设备位置落格的，病灶中心附近一圈都会出检出，
+   *      邻域里有障碍就意味着又会在障碍格上报出病害。
+   *
+   * 不满足时按「先横后竖、逐格外扩」的顺序找最近的合法位置。
+   * 找不到就退回原位（宁可保留一个已知问题，也不要静默丢掉一个病灶）。
+   */
+  relocateHotspots(hotspots) {
+    const f = this.field;
+    const blocked = (r, c) => {
+      if (r < 0 || r >= f.gridRows || c < 0 || c >= f.gridCols) return true;
+      for (const o of f.obstacles) {
+        const c0 = Math.floor(o.x / f.cellW), c1 = Math.ceil((o.x + o.w) / f.cellW);
+        const r0 = Math.floor(o.y / f.cellH), r1 = Math.ceil((o.y + o.h) / f.cellH);
+        if (r >= r0 && r < r1 && c >= c0 && c < c1) return true;
+      }
+      return false;
+    };
+    const neighborhoodClean = (r, c) => {
+      for (let dr = -2; dr <= 2; dr++) {
+        for (let dc = -2; dc <= 2; dc++) if (blocked(r + dr, c + dc)) return false;
+      }
+      return true;
+    };
+    return hotspots.map(h => {
+      if (!blocked(h.row, h.col) && neighborhoodClean(h.row, h.col)) return h;
+      for (let d = 1; d < Math.max(f.gridRows, f.gridCols); d++) {
+        for (let dr = -d; dr <= d; dr++) {
+          for (let dc = -d; dc <= d; dc++) {
+            // 只看当前外扩环
+            if (Math.max(Math.abs(dr), Math.abs(dc)) !== d) continue;
+            const r = h.row + dr, c = h.col + dc;
+            if (!blocked(r, c) && neighborhoodClean(r, c)) {
+              return { ...h, row: r, col: c };
+            }
+          }
+        }
+      }
+      return h;
+    });
   }
 
   detectAt(x, y, part, kind, forceDisease = null) {

@@ -52,7 +52,9 @@ for (const [id, label] of PAGES) {
   const btn = page.locator('.nav button', { hasText: label }).first();
   if (!(await btn.count())) { log.push(`${label.padEnd(6)} FAIL — 导航项找不到`); continue; }
   await btn.click();
-  await page.waitForTimeout(2200);
+  // 云端 DO 冷启动 + 算法基准页要拉 4 组基准数据，2.2 s 不够，
+  // 会出现「页面只有 121 字符」的误判（实际渲染是好的）。给足时间。
+  await page.waitForTimeout(4200);
   const main = await page.locator('main.content, main').first().innerText();
   const len = main.replace(/\s+/g, '').length;
   const head = main.split('\n').filter(s => s.trim())[0] || '';
