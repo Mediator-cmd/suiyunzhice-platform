@@ -17,6 +17,7 @@ import { LinkageEngine } from '../../shared/linkage.js';
 import { Simulator } from '../../shared/simulator.js';
 import { LinkStats } from '../../shared/linkstats.js';
 import { buildSprayMissions, buildRecheckMission } from '../../shared/spraydispatch.js';
+import { sprayFeasibilityReport } from '../../shared/droplets.js';
 import { OFFICIAL_URL } from './platform-info.js';
 import {
   generateSprayRoute, solveSprayRatio, scoreRoute,
@@ -680,6 +681,27 @@ class LocalEngine {
     };
   }
 
+  /**
+   * 喷洒可行性评估 —— 雾滴输运模型（浏览器内实现，与服务端同源）
+   *
+   * 回答「当前风速还能不能喷」「药有多少落在靶区外」。
+   * 判据：靶区命中率 ≥ 60%。
+   */
+  algoSprayFeasibility(body = {}) {
+    const b = body || {};
+    const w = currentWeather();
+    return sprayFeasibilityReport({
+      windSpeed: b.windSpeed ?? w.wind ?? 3,
+      windDirDeg: b.windDirDeg ?? 45,
+      swath: b.swath ?? 5,
+      vmd: b.vmd ?? 140,
+      tempC: b.tempC ?? 22,
+      rh: b.rh ?? 0.6,
+      n: b.n,
+      vmds: b.vmds,
+    });
+  }
+
   /** 作业范围预览（只算不下发） */
   fleetPlan(body) {
     const b = body || {};
@@ -940,6 +962,9 @@ export const api = {
   /** 五种分配算法对比 */
   algoSwarmCompare: (body) =>
     withFallback(() => post('/algo/swarm/compare', body), () => getLocalEngine().algoSwarmCompare(body)),
+  /** 喷洒可行性（雾滴输运模型） */
+  algoSprayFeasibility: (body) =>
+    withFallback(() => post('/algo/spray/feasibility', body), () => getLocalEngine().algoSprayFeasibility(body)),
 
   /* ---- 装备操控 ---- */
   /** 作业方式与直接指令目录 */

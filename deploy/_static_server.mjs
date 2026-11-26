@@ -10,7 +10,8 @@ import { readFile } from 'node:fs/promises';
 import { join, extname, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = fileURLToPath(new URL('../web/dist/', import.meta.url));
+const ROOT = fileURLToPath(new URL(
+  process.env.ROOT_DIR ? `../${process.env.ROOT_DIR}/` : '../web/dist/', import.meta.url));
 const PORT = Number(process.env.PORT || 4173);
 
 const MIME = {
@@ -20,6 +21,9 @@ const MIME = {
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.webp': 'image/webp',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
 };

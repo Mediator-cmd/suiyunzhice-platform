@@ -40,6 +40,7 @@ import {
 import {
   solveSprayRatio, generateSprayRoute, scoreRoute,
 } from '../../shared/planner.js';
+import { sprayFeasibilityReport } from '../../shared/droplets.js';
 import { ONBOARDING_STEPS, CODE_SAMPLES } from '../../shared/openplatform.js';
 import {
   FARMER_MSG_TYPES, buildFarmerMessage, toPushPayload, WECHAT_SERVICE, nonEmptyMessages,
@@ -1117,6 +1118,38 @@ export function createApiRouter(deps) {
           + '与「离线实验基准」相互独立。',
       },
     });
+  });
+
+  /**
+   * 喷洒可行性评估 —— 雾滴输运模型（shared/droplets.js）
+   *
+   * 回答两个现场最常被问的问题：
+   *   ① 当前风速下还能不能喷？
+   *   ② 喷出去的药有多少落在靶区之外？
+   *
+   * 返回三档雾滴谱（110 / 140 / 170 μm）下的靶区命中率、P95 漂移，
+   * 以及 0–8 m/s 的作业窗口曲线。
+   *
+   * 耗时说明：一次调用要跑 3 档雾滴谱 × 1 组 + 9 组作业窗口 = 12 次单次喷洒
+   * 模拟，每次 2500 滴。按优化后的内核（终端速度查表 + d² 上积分）
+   * 单次约 30 ms，整接口约 350 ms —— 前端滑块可以实时跟手。
+   *
+   * POST /algo/spray/feasibility
+   *   body: { windSpeed?, windDirDeg?, vmd?, swath?, tempC?, rh?, n? }
+   */
+  api.post('/algo/spray/feasibility', (req, res) => {
+    const b = req.body || {};
+    const weather = currentWeather();
+    res.json(sprayFeasibilityReport({
+      windSpeed: b.windSpeed ?? weather.wind ?? 3,
+      windDirDeg: b.windDirDeg ?? 45,
+      swath: b.swath ?? 5,
+      vmd: b.vmd ?? 140,
+      tempC: b.tempC ?? 22,
+      rh: b.rh ?? 0.6,
+      n: b.n,
+      vmds: b.vmds,
+    }));
   });
 
   return api;

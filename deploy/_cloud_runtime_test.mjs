@@ -240,6 +240,7 @@ async function main() {
   const POSTS = [
     ['/algo/swarm/plan', { nDrones: 4, algo: 'pso-aco' }],
     ['/algo/swarm/compare', { nDrones: 4 }],
+    ['/algo/spray/feasibility', { windSpeed: 4, vmd: 140 }],
   ];
   for (const [p, body] of POSTS) {
     const req = new MiniRequest({
@@ -254,6 +255,17 @@ async function main() {
       ifaceDiff++; console.log(`  ✗ POST ${p} status=${res.statusCode}`);
     } else if (p === '/algo/swarm/plan' && parsed.ok) {
       console.log(`  ✓ POST ${p} → 航程 ${parsed.metrics.totalLengthM} m / 覆盖 ${parsed.metrics.coverage}`);
+    } else if (p === '/algo/spray/feasibility') {
+      const r140 = (parsed.rows || []).find(r => r.vmd === 140);
+      const okShape = parsed.rows?.length === 3 && parsed.window?.length === 9
+        && typeof r140?.onTarget === 'number' && r140.onTarget >= 0 && r140.onTarget <= 1;
+      if (!okShape) {
+        ifaceDiff++;
+        console.log(`  ✗ POST ${p} 返回结构不完整`, JSON.stringify(parsed).slice(0, 160));
+      } else {
+        console.log(`  ✓ POST ${p} → 140μm 靶区命中率 ${(r140.onTarget * 100).toFixed(1)}%`
+          + ` / 安全上限 ${parsed.maxSafeWind} m/s`);
+      }
     }
   }
   console.log(`  ${POSTS.length} 个 POST 接口，${ifaceDiff} 个异常`);

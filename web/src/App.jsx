@@ -34,6 +34,7 @@ import Mobile       from './pages/Mobile.jsx';
 import Fleet        from './pages/Fleet.jsx';
 import Dispatch     from './pages/Dispatch.jsx';
 import Algorithms   from './pages/Algorithms.jsx';
+import SprayWindow  from './pages/SprayWindow.jsx';
 
 /**
  * 板块设置（信息架构）
@@ -77,8 +78,9 @@ const NAV_GROUPS = [
     group: '智能决策',
     items: [
       { id: 'analytics',  label: '数据分析', icon: 'chart',  sub: '六维统计与结论' },
-      { id: 'agro',       label: '农情策略', icon: 'leaf',   sub: '气象、施药窗口与策略库' },
+      { id: 'agro',       label: '农情策略', icon: 'leaf',   sub: '气象条件、药剂与安全间隔期' },
       { id: 'planner',    label: '路径规划', icon: 'route',  sub: '自动规划与比例求解' },
+      { id: 'spray',      label: '施药窗口', icon: 'spray',  sub: '雾滴输运模型与作业判据' },
       { id: 'algorithms', label: '算法基准', icon: 'chart',  sub: '检测/规划/融合/施药实验基准' },
       { id: 'planning',   label: '平台方案', icon: 'doc',    sub: '能力、硬件与接入协议' },
     ],
@@ -273,7 +275,7 @@ export default function App() {
     overview: Overview, realtime: Realtime, linkage: Linkage,
     fleet: Fleet, dispatch: Dispatch,
     analytics: Analytics, agro: Agro, planner: Planner, planning: Planning,
-    algorithms: Algorithms,
+    algorithms: Algorithms, spray: SprayWindow,
     farm: Farm, arch: Architecture,
     tenancy: Tenancy, access: Access, metering: Metering, developers: Developers,
     mobile: Mobile,
