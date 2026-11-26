@@ -515,7 +515,7 @@ export function createApiRouter(deps) {
       commands: cmds.length,
       commandsDone: cmds.filter(c => c.state === COMMAND_STATES.done).length,
       // 接口总数（与「平台方案」页的接口清单同源）
-      endpointCount: 41,
+      endpointCount: 55,
       // 数据契约种类
       contracts: ['遥测帧 TELEMETRY', '识别结果 DETECTION', '作业任务 MISSION', '联动事件 LINK_EVENT'],
       steps: ONBOARDING_STEPS.length,

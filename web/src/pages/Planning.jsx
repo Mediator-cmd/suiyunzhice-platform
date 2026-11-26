@@ -163,6 +163,20 @@ const API_ROWS = [
   ['GET', '/api/openapi/stats', '开放平台接入现状统计'],
   ['GET', '/api/farmer/messages', '农户服务推送内容（公众号 / 小程序）'],
   ['POST', '/api/access/devices/{id}/restore', '恢复已吊销的设备密钥'],
+  /* ---- 装备操控与作业调度 ---- */
+  ['GET', '/api/fleet/modes', '作业方式目录与直接指令目录'],
+  ['POST', '/api/fleet/plan', '按作业方式与作业范围生成航线预览（不下发）'],
+  ['POST', '/api/fleet/command', '下发作业或直接指令，驱动设备真实执行'],
+  ['GET', '/api/fleet/status', '装备台账：设备状态、当前指令与执行历史'],
+  ['POST', '/api/fleet/speed', '演示加速档位（1~600 倍）'],
+  /* ---- 算法基准与多机协同 ---- */
+  ['GET', '/api/algo/benchmarks', '四组离线实验基准数据集'],
+  ['GET', '/api/algo/benchmarks/{key}', '单组基准明细'],
+  ['POST', '/api/algo/swarm/plan', '多机协同规划（PSO/GA/ACO/PSO-ACO）'],
+  ['POST', '/api/algo/swarm/compare', '多算法对照求解'],
+  ['POST', '/api/algo/spray/feasibility', '雾滴输运模型与施药窗口可行性判定'],
+  /* ---- 基准场景 ---- */
+  ['GET', '/api/baseline', '示范田全田覆盖与靶向点喷基准对比报告'],
 ];
 
 export default function Planning() {
