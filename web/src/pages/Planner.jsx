@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { api, post } from '../api.js';
 import { FieldMap } from '../components/FieldMap.jsx';
+import { figureSrc } from '../research-figures.js';
 
 /**
  * 路径规划页
@@ -61,6 +62,56 @@ export default function Planner({ meta }) {
       <div className="page-head">
         <h2>路径规划 · 自动规划替代人工手画</h2>
         <p>航向×速度×喷幅三维联合搜索，按经济 / 快速 / 环保三档权重出解，并同步求解速度-喷洒比例。</p>
+      </div>
+
+      {/*
+        论文图 12 与图 13：规划器的对照实验。
+        图 12 是三种地形下「最近邻 A*」与「PSO-ACO 混合算法」的航迹对比；
+        图 13 是 18 个地块上能耗 / 时长 / 航程 / 转弯四项指标的箱线图。
+        两者都是离线实验基准（18 块仿真地块），与本页的实时规划结果口径独立，
+        所以图上标明了这一点。
+      */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="sub-title">
+          <span className="chip">论文 图 12</span>
+          航迹对比：最近邻 A* 与 PSO-ACO
+          <span className="tag">离线实验基准</span>
+        </div>
+        <img
+          src={figureSrc('fig12-route-comparison')}
+          alt="三种地形下最近邻 A* 与 PSO-ACO 的航迹对比"
+          style={{
+            width: '100%',
+            display: 'block',
+            borderRadius: 8,
+            background: '#fff',
+            border: '1px solid var(--line)',
+          }}
+        />
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="sub-title">
+          <span className="chip">论文 图 13</span>
+          18 个地块的指标箱线图
+          <span className="tag">离线实验基准</span>
+        </div>
+        <img
+          src={figureSrc('fig13-field-boxplots')}
+          alt="18 地块在能耗、时长、航程、转弯四项上的算法对比箱线图"
+          style={{
+            width: '100%',
+            display: 'block',
+            borderRadius: 8,
+            background: '#fff',
+            border: '1px solid var(--line)',
+          }}
+        />
+        <p className="hint" style={{ marginTop: 10 }}>
+          18 块仿真地块的均值：总航程 2084 → 1794 m（↓14%），
+          作业时长 810 → 689 min（↓15%），能耗 1968 → 1674 Wh（↓15%），
+          转弯次数 198 → 164（↓17%）。混合算法在时长与航程上最优。
+        </p>
       </div>
 
       <div className="card" style={{ marginBottom: 12 }}>

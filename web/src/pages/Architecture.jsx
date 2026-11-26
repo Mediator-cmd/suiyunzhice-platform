@@ -1,5 +1,6 @@
 import React from 'react';
 import SceneDiagram from '../components/SceneDiagram.jsx';
+import { figureSrc } from '../research-figures.js';
 import {
   IconDrone, IconRobot, IconPlant, IconSocket, IconBatch, IconBroker,
   IconCloudServer, IconEngine, IconRoute, IconChart,
@@ -69,6 +70,40 @@ export default function Architecture() {
       <div className="page-head">
         <h2>系统架构 · 空地协同植保云平台</h2>
         <p>无人机空中巡检、地面机器人近距复核、云端居中裁决与下发，四类功能统一在同一份数据契约之下。</p>
+      </div>
+
+      {/* ============ 论文架构图 ============ */}
+      {/*
+        这张图来自队友交付的论文图包（图 1）。
+        它与本页下面的平台架构是同一套东西的两种画法 ——
+        论文画的是「感知 → 检测 → 规划 → 执行」的算法流水线，
+        本页画的是「感知 → 传输 → 云端 → 应用」的分层结构。
+        放在一起是为了说明：平台不是论文的演示壳，
+        而是论文里的算法真的在跑。
+      */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="sub-title">
+          <span className="chip">论文 图 1</span>
+          系统总体架构与数据流
+          <span className="tag">四段式流水线</span>
+        </div>
+        <img
+          src={figureSrc('fig01-system-architecture')}
+          alt="感知、检测、规划、执行四段式流水线的数据流与核心公式"
+          style={{
+            width: '100%',
+            display: 'block',
+            borderRadius: 8,
+            background: '#fff',
+            border: '1px solid var(--line)',
+          }}
+        />
+        <p className="hint" style={{ marginTop: 10 }}>
+          多源感知（RGB / 热红外 / 飞行状态 / GNSS / 气象）汇入病害检测，
+          再经多机协同任务分配与植保作业执行闭环 ——
+          本平台的「算法基准」页给出的检测精度、规划收益、施药剂量，
+          就是这张图上每个环节的实测结果。
+        </p>
       </div>
 
       {/* ============ 场景总图 ============ */}

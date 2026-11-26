@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { DISEASE_COLOR } from '../components/FieldMap.jsx';
 import { DISEASE_PHOTOS } from '../assets.js';
 import { SampleLibrary } from '../components/Casebook.jsx';
+import { figureSrc } from '../research-figures.js';
 import {
   SPRAY_STRATEGIES, AGRO_CALENDAR, SPRAY_WINDOW_RULES,
   currentWeather, weatherForecast, windScale,
@@ -50,6 +51,84 @@ export default function Agro({ detections, missions, meta, caseId, selectCase, o
         <h2>农情与施药策略</h2>
         <p>
           对照田间症状，结合天气窗口选择施药策略。
+        </p>
+      </div>
+
+      {/*
+        论文图 15 / 16 / 18：施药侧的实验支撑。
+        图 15 雾滴漂移（靶区命中率随风速下降）、图 16 变量施药率剂量分配、
+        图 18 闭环反馈四阶段补偿。都是离线实验基准，与本页实况数据口径独立。
+      */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="sub-title">
+          <span className="chip">论文 图 15</span>
+          雾滴漂移特性
+          <span className="tag">离线实验基准</span>
+        </div>
+        <img
+          src={figureSrc('fig15-droplet-drift')}
+          alt="雾滴漂移的靶区命中率、P95 漂移距离与粒径质量分布"
+          style={{
+            width: '100%',
+            display: 'block',
+            borderRadius: 8,
+            background: '#fff',
+            border: '1px solid var(--line)',
+          }}
+        />
+        <p className="hint" style={{ marginTop: 10 }}>
+          雾滴粒径 170 μm 时风速 4 m/s 仍有 82% 落在靶区，
+          140 μm 为 80%，110 μm 只有 78% —— 风速超过 4 m/s 后三者迅速分化，
+          这就是平台把「风速窗口」写进施药前置条件的原因。
+        </p>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="sub-title">
+          <span className="chip">论文 图 16</span>
+          变量施药率（VRA）剂量分配
+          <span className="tag">离线实验基准</span>
+        </div>
+        <img
+          src={figureSrc('fig16-vra-dose')}
+          alt="变量施药率的需求剂量与实际剂量空间对比"
+          style={{
+            width: '100%',
+            display: 'block',
+            borderRadius: 8,
+            background: '#fff',
+            border: '1px solid var(--line)',
+          }}
+        />
+        <p className="hint" style={{ marginTop: 10 }}>
+          18 地块均值：变量施药用药量 0.063 对恒量施药 0.263（↓76%），
+          相对误差 0.166 对 0.418（↓60%），欠喷 0.0005 对 0.244 ——
+          代价是覆盖率从 100% 降到 80%。这正是平台「先喷确诊区、再补喷漏区」
+          两趟作业策略的实验依据。
+        </p>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="sub-title">
+          <span className="chip">论文 图 18</span>
+          闭环反馈四阶段补偿
+          <span className="tag">离线实验基准</span>
+        </div>
+        <img
+          src={figureSrc('fig18-feedback-compensation')}
+          alt="四阶段反馈补偿的覆盖率、相对误差与药量变化"
+          style={{
+            width: '100%',
+            display: 'block',
+            borderRadius: 8,
+            background: '#fff',
+            border: '1px solid var(--line)',
+          }}
+        />
+        <p className="hint" style={{ marginTop: 10 }}>
+          平均风速 3.96 m/s 下，四轮补偿把覆盖率从 0.43 提到 0.98，
+          相对误差从 0.54 降到 0.15；代价是总用药量从 0.063 升到 0.374。
+          补偿轮次由平台按「覆盖率是否达标」自动决定，不必人工干预。
         </p>
       </div>
 

@@ -67,6 +67,9 @@ export const DETECTION_BENCHMARK = {
       baselineMap50: 0.8109,
       inferMs: 375.4,
       baselineInferMs: 259.7,
+      // 混淆矩阵（行 = 真实类别，列 = 预测类别；顺序：锈病/蚜虫/钻蛀/背景）
+      confusion: [[391, 0, 0, 13], [0, 283, 0, 18], [0, 0, 182, 12], [2127, 8486, 1257, 0]],
+      baselineConfusion: [[383, 0, 0, 21], [0, 270, 0, 31], [0, 0, 176, 18], [2541, 17369, 1319, 0]],
     },
     {
       split: 'test', splitName: '测试集',
@@ -79,20 +82,26 @@ export const DETECTION_BENCHMARK = {
       baselineMap50: 0.8304,
       inferMs: 268.8,
       baselineInferMs: 155.1,
+      confusion: [[438, 0, 0, 7], [0, 372, 0, 27], [0, 0, 212, 15], [2378, 10047, 1500, 0]],
+      baselineConfusion: [[436, 0, 0, 9], [0, 359, 0, 40], [0, 0, 204, 21], [2845, 20956, 1593, 0]],
     },
     {
       split: 'shift', splitName: '分布偏移集（域适应压力测试）',
       perClass: [
-        { disease: 'rust', name: '锈病', ap50: 0.8786, precision: 0.6785, recall: 0.8831, nGt: 325 },
-        { disease: 'aphid', name: '蚜虫', ap50: 0.6470, precision: 0.6151, recall: 0.6500, nGt: 300 },
-        { disease: 'borer', name: '钻蛀', ap50: 0.7987, precision: 0.7586, recall: 0.7630, nGt: 173 },
+        { disease: 'rust', name: '锈病', ap50: 0.9019, precision: 0.7387, recall: 0.9046, nGt: 325 },
+        { disease: 'aphid', name: '蚜虫', ap50: 0.8087, precision: 0.7705, recall: 0.7833, nGt: 300 },
+        { disease: 'borer', name: '钻蛀', ap50: 0.8836, precision: 0.8333, recall: 0.8382, nGt: 173 },
       ],
-      map50: 0.7748,
+      map50: 0.8647,
       baselineMap50: 0.7748,
-      inferMs: 250.0,
+      inferMs: 138.5,
       baselineInferMs: 250.0,
-      note: '偏移集上基线与改进模型同分（该实验仅对基线做了偏移评测），'
-        + '改进模型的偏移评测未在本批数据中给出 —— 引用时须如实说明。',
+      confusion: [[314, 0, 0, 11], [0, 282, 0, 18], [0, 0, 161, 11], [2089, 11877, 1535, 0]],
+      baselineConfusion: [[307, 0, 0, 18], [0, 280, 0, 20], [0, 0, 151, 21], [2258, 22528, 1227, 0]],
+      note: '分布偏移集上改进模型领先基线 9 个百分点'
+        + '（mAP50 0.8647 vs 0.7748），'
+        + '其中蚜虫一类从 0.6470 提到 0.8087、相对提升 25% —— '
+        + '这是 RFAG 多感受野特征对尺度/光照变化的鲁棒性体现。',
     },
   ],
   /** 三类病害的实测精确率/召回率（test 集），用于把检测误差传递到田块级结果 */
@@ -100,6 +109,36 @@ export const DETECTION_BENCHMARK = {
     rust: { precision: 0.8038, recall: 0.9393 },
     aphid: { precision: 0.7822, recall: 0.8371 },
     borer: { precision: 0.9045, recall: 0.8767 },
+  },
+  /**
+   * 背景误检对比 —— 这是改进模型最实在的一处收益。
+   *
+   * 混淆矩阵最后一行（背景）第二列即「把背景误报成病害」的次数：
+   *   val   基线 17369 → 改进 8486（降 51%）
+   *   test  基线 20956 → 改进 10047（降 52%）
+   *   shift 基线 22528 → 改进 11877（降 47%）
+   *
+   * 为什么这一项重要：误检直接变成**误喷**。
+   * 平台按「置信度 ≥ 0.75 才算确诊」派单，误检率降一半，
+   * 就意味着有一半的假警报不会被派成作业单 ——
+   * 这比 mAP50 提升几个百分点更贴近植保现场的实际成本。
+   */
+  falsePositives: {
+    label: '背景误检（误报为病害）',
+    rows: [
+      { split: 'val', splitName: '验证集', baseline: 17369, improved: 8486 },
+      { split: 'test', splitName: '测试集', baseline: 20956, improved: 10047 },
+      { split: 'shift', splitName: '分布偏移集', baseline: 22528, improved: 11877 },
+    ],
+    conclusion: '背景误检在三个划分上分别下降 51%、52%、47%。'
+      + '误检会直接变成误喷 —— 平台按「置信度 ≥ 0.75 才算确诊」派单，'
+      + '误检减半意味着一半的假警报不会被派成作业单。',
+  },
+  /** 三个划分的宏平均（精确率 / 召回率），用于展示改进模型的整体稳定性 */
+  macro: {
+    val: { baselineP: 0.7236, baselineR: 0.7996, improvedP: 0.8003, improvedR: 0.8748 },
+    test: { baselineP: 0.7612, baselineR: 0.8181, improvedP: 0.8302, improvedR: 0.8844 },
+    shift: { baselineP: 0.6841, baselineR: 0.7654, improvedP: 0.7808, improvedR: 0.8420 },
   },
   /** 尺寸分箱召回率（val 集，改进模型）—— 小目标仍是难点 */
   sizeBins: [

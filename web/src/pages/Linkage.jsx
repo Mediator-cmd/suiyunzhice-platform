@@ -1,6 +1,7 @@
 import { CHART } from '../theme.js';
 import { dedupeLinkEvents } from '../events.js';
 import { CaseReplay } from '../components/Casebook.jsx';
+import { figureSrc } from '../research-figures.js';
 import React, { useMemo } from 'react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid,
@@ -75,6 +76,38 @@ export default function Linkage({ meta, devices, detections, events, overview, c
       <div className="page-head">
         <h2>空地联动 · 三者实时协同</h2>
         <p>空地数据在同一条决策链上互补：空中给广度与速度，地面给深度与确定性，云端裁决并下发。</p>
+      </div>
+
+      {/*
+        论文图 11：定位精度与脱靶率的三联图。
+        这是「空地互补」在定位层面的实验依据 ——
+        空中 GNSS 单点定位误差大（P95 偏移 2.94 m），
+        地面机器人近距复核 + 融合定位把脱靶率从 40.3% 压到 0.0005%。
+        与本页的实时联动事件口径独立，属离线实验基准。
+      */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="sub-title">
+          <span className="chip">论文 图 11</span>
+          定位精度与脱靶率
+          <span className="tag">离线实验基准</span>
+        </div>
+        <img
+          src={figureSrc('fig11-localization')}
+          alt="时钟同步误差、状态估计 RMSE 与定位误差到脱靶率的关系三联图"
+          style={{
+            width: '100%',
+            display: 'block',
+            borderRadius: 8,
+            background: '#fff',
+            border: '1px solid var(--line)',
+          }}
+        />
+        <p className="hint" style={{ marginTop: 10 }}>
+          滤波后状态估计 RMSE 0.084 m（仅 GNSS 时 5.616 m）；
+          定位方式从 GPS 单点换成 GNSS+IMU+LiDAR 融合后，
+          脱靶率由 40.3% 降到 0.0005%，P95 偏移由 2.94 m 降到 0.54 m ——
+          这正是「地面机器人近距复核」在整条链路里的价值所在。
+        </p>
       </div>
 
       {/* 联动链路示意 */}

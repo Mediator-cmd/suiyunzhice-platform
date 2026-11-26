@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { CHART } from '../theme.js';
 import { api } from '../api.js';
+import { RESEARCH_FIGURES, FIGURE_GROUPS, figureSrc } from '../research-figures.js';
 
 /**
  * 算法基准页 —— 把研究代码的实验结论变成平台内可查、可引用的数据
@@ -25,6 +26,7 @@ const TABS = [
   { key: 'fusion', label: '多传感器融合' },
   { key: 'spray', label: '施药与沉积' },
   { key: 'live', label: '平台实时计算' },
+  { key: 'figures', label: '论文图集' },
 ];
 
 const pct = (v, d = 1) => (v == null ? '—' : `${(v * 100).toFixed(d)}%`);
@@ -37,6 +39,7 @@ export default function Algorithms({ onNav }) {
 
   useEffect(() => {
     let alive = true;
+    if (tab === 'figures') { setLoading(false); return undefined; }
     setLoading(true);
     api.algoBenchmark(tab === 'live' ? 'detection' : tab)
       .then(r => { if (alive) setBench(r); })
@@ -71,10 +74,11 @@ export default function Algorithms({ onNav }) {
       </div>
 
       {loading && <div className="empty">正在加载算法基准…</div>}
-      {!loading && tab !== 'live' && bench?.benchmark && (
+      {!loading && tab !== 'live' && tab !== 'figures' && bench?.benchmark && (
         <BenchView key={tab} bench={bench.benchmark} notice={bench.notice} />
       )}
       {!loading && tab === 'live' && <LiveView onNav={onNav} />}
+      {!loading && tab === 'figures' && <FiguresView onPick={setTab} />}
     </div>
   );
 }
@@ -88,6 +92,138 @@ function BenchView({ bench, notice }) {
   if (bench.id.startsWith('swarm-planning')) return <PlanningBench bench={bench} notice={notice} />;
   if (bench.id.startsWith('multisensor')) return <FusionBench bench={bench} notice={notice} />;
   return <SprayBench bench={bench} notice={notice} />;
+}
+
+/* =====================================================================
+ * 论文图集
+ * ===================================================================== */
+
+/** 图 → 承载其数字的标签页（图只是可视化，结论在数据里） */
+const FIGURE_DATA_TAB = {
+  detection: 'detection',
+  fusion: 'fusion',
+  planning: 'planning',
+  spray: 'spray',
+  feedback: 'spray',
+  architecture: 'planning',
+  terrain: 'detection',
+};
+
+/** 一组论文图（图号 + 标题 + 图 + 图注），供各数据页内嵌 */
+function PaperFigureGroup({ ids, columns = 2 }) {
+  return (
+    <div className="grid g2">
+      {ids.map(id => {
+        const f = RESEARCH_FIGURES.find(x => x.id === id);
+        if (!f) return null;
+        return (
+          <figure className="card" key={f.id} style={{ margin: 0 }}>
+            <img
+              src={figureSrc(f.id)}
+              alt={f.alt}
+              loading="lazy"
+              style={{
+                width: '100%',
+                display: 'block',
+                borderRadius: 8,
+                background: '#fff',
+                border: '1px solid var(--line)',
+              }}
+            />
+            <figcaption style={{ marginTop: 10 }}>
+              <div className="sub-title">
+                <span className="chip">{f.paper}</span>
+                {f.title}
+              </div>
+              <p className="hint" style={{ margin: '6px 0 0' }}>{f.caption}</p>
+            </figcaption>
+          </figure>
+        );
+      })}
+    </div>
+  );
+}
+
+function FiguresView({ onPick }) {
+  const [group, setGroup] = useState('all');
+  const list = useMemo(
+    () => (group === 'all'
+      ? RESEARCH_FIGURES
+      : RESEARCH_FIGURES.filter(f => f.group === group)),
+    [group]
+  );
+
+  return (
+    <div>
+      <div className="notice-line">
+        <span className="chip mute">论文实验图集</span>
+        <span>
+          队友交付的 18 张矢量图（matplotlib 生成），已转 WebP 静态托管。
+          图是数据的可视化 —— 每张图对应的数字在下方标注的数据页里，
+          两者口径一致。
+        </span>
+        <span className="src mono">E:\挑战杯\新加入材料\矢图打包(1)</span>
+      </div>
+
+      <div className="tabs small" style={{ marginBottom: 14 }}>
+        <button
+          className={`tab ${group === 'all' ? 'on' : ''}`}
+          onClick={() => setGroup('all')}
+        >
+          全部 {RESEARCH_FIGURES.length}
+        </button>
+        {FIGURE_GROUPS.map(g => {
+          const n = RESEARCH_FIGURES.filter(f => f.group === g.id).length;
+          if (!n) return null;
+          return (
+            <button
+              key={g.id}
+              className={`tab ${group === g.id ? 'on' : ''}`}
+              onClick={() => setGroup(g.id)}
+            >
+              {g.label} {n}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="grid g2">
+        {list.map(f => {
+          const tab = FIGURE_DATA_TAB[f.group];
+          return (
+            <figure className="card" key={f.id} style={{ margin: 0 }}>
+              <img
+                src={figureSrc(f.id)}
+                alt={f.alt}
+                loading="lazy"
+                style={{
+                  width: '100%',
+                  display: 'block',
+                  borderRadius: 8,
+                  background: '#fff',
+                  border: '1px solid var(--line)',
+                }}
+              />
+              <figcaption style={{ marginTop: 10 }}>
+                <div className="sub-title">
+                  <span className="chip">{f.paper}</span>
+                  {f.title}
+                </div>
+                <p className="hint" style={{ margin: '6px 0 0' }}>{f.caption}</p>
+                <button
+                  className="link-btn"
+                  style={{ marginTop: 8 }}
+                  onClick={() => onPick(tab)}
+                >
+                  查看对应数据 →
+                </button>
+              </figcaption>
+            </figure>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function BenchNotice({ notice }) {
@@ -133,6 +269,20 @@ function DetectionBench({ bench, notice }) {
     <>
       <BenchNotice notice={notice} />
 
+      <div style={{ marginBottom: 16 }}>
+        <div className="sub-title" style={{ marginBottom: 10 }}>
+          <span className="chip">论文原图</span>
+          网络结构 · 训练收敛 · 混淆矩阵 · 分布偏移
+          <span className="tag">与下方数据同源</span>
+        </div>
+        <PaperFigureGroup ids={[
+          'fig04-rfag-pda-network',
+          'fig05-training-curves',
+          'fig09-confusion-matrix',
+          'fig10-shift-performance',
+        ]} />
+      </div>
+
       <div className="grid g4" style={{ marginBottom: 16 }}>
         <div className="card">
           <div className="kpi">
@@ -157,11 +307,14 @@ function DetectionBench({ bench, notice }) {
         </div>
         <div className="card">
           <div className="kpi">
-            <span className="label">实测精确率 / 召回率</span>
-            <span className="value">
-              {bench.calibration.rust.precision.toFixed(2)} / {bench.calibration.rust.precision.toFixed(2)}
+            <span className="label">背景误检（偏移集）</span>
+            <span className="value green">
+              ↓ {(((bench.falsePositives.rows[2].baseline - bench.falsePositives.rows[2].improved)
+                / bench.falsePositives.rows[2].baseline) * 100).toFixed(0)}%
             </span>
-            <span className="sub">锈病 · 三病种见下表</span>
+            <span className="sub mono">
+              {bench.falsePositives.rows[2].baseline.toLocaleString()} → {bench.falsePositives.rows[2].improved.toLocaleString()} 次
+            </span>
           </div>
         </div>
       </div>
@@ -251,6 +404,32 @@ function DetectionBench({ bench, notice }) {
             </ResponsiveContainer>
           </div>
         </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <h3>
+          背景误检对比
+          <span className="tag">改进模型最实在的收益</span>
+        </h3>
+        <p className="hint">{bench.falsePositives.conclusion}</p>
+        <div className="grid g3">
+          {bench.falsePositives.rows.map(r => {
+            const drop = ((r.baseline - r.improved) / r.baseline) * 100;
+            return (
+              <div className="kpi" key={r.split}>
+                <span className="label">{r.splitName}</span>
+                <span className="value green">↓ {drop.toFixed(0)}%</span>
+                <span className="sub mono">
+                  {r.baseline.toLocaleString()} → {r.improved.toLocaleString()} 次
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <p className="conclusion">
+          mAP50 提升是「平均分」，背景误检下降是「实打实的作业单减少」——
+          误检在平台上会变成误喷。所以这一项比 mAP50 更能说明工程价值。
+        </p>
       </div>
 
       <div className="grid g2">
