@@ -96,6 +96,27 @@ async function main() {
     check(false, '联动事件', e.message);
   }
 
+  // ---- 1a. 农户简报 KPI 的来源可追溯 ----
+  // 「误检率」不得再是硬编码的无出处百分数（那等于平台在引用申报书的数，
+  // 构成循环引用）。必须来自离线检测基准，并标注为离线口径。
+  console.log('\n--- 农户简报 KPI ---');
+  try {
+    const br = await call('/briefing');
+    const kpi = (br.body?.kpis || []).find(k => /误检/.test(k.label || ''));
+    check(!!kpi, '简报含误检率 KPI', kpi ? `${kpi.label}=${kpi.value}` : '缺失');
+    if (kpi) {
+      const v = parseFloat(kpi.value);
+      check(Number.isFinite(v), '误检率是数值', kpi.value);
+      check(v >= 5 && v <= 30, '误检率取值合理（离线基准派生）', `${kpi.value}`);
+      check(/离线基准/.test(kpi.sub || ''), '误检率标注为离线基准口径', kpi.sub);
+      check(!/计划书/.test(kpi.sub || ''), '误检率不再引用申报书口径', kpi.sub);
+    }
+    const conf = (br.body?.kpis || []).find(k => /置信/.test(k.label || ''));
+    check(!!conf && /非准确率/.test(conf?.sub || ''), '置信度标注为模型自评分', conf?.sub);
+  } catch (e) {
+    check(false, '农户简报 KPI', e.message);
+  }
+
   // ---- 1b. 计算型接口（POST）----
   // 这几个接口证明 Worker 上跑的是新代码，而不只是静态资产更新。
   console.log('\n--- 计算型接口 ---');
