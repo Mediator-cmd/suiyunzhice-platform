@@ -96,6 +96,42 @@ async function main() {
     check(false, '联动事件', e.message);
   }
 
+  // ---- 1b. 计算型接口（POST）----
+  // 这几个接口证明 Worker 上跑的是新代码，而不只是静态资产更新。
+  console.log('\n--- 计算型接口 ---');
+  const postCall = async (p, body) => {
+    if (!api) return { status: 0, body: {} };
+    const res = await fetch(`${api}${p}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30000),
+    });
+    const text = await res.text();
+    let parsed;
+    try { parsed = JSON.parse(text); } catch { parsed = text; }
+    return { status: res.status, body: parsed };
+  };
+
+  try {
+    const r = await postCall('/algo/swarm/plan', { nDrones: 4, algo: 'pso-aco' });
+    check(r.status === 200 && r.body?.ok, 'POST /algo/swarm/plan',
+      r.body?.metrics ? `航程 ${r.body.metrics.totalLengthM} m` : `status=${r.status}`);
+  } catch (e) {
+    check(false, 'POST /algo/swarm/plan', e.message);
+  }
+
+  try {
+    const r = await postCall('/algo/spray/feasibility', { windSpeed: 4, vmd: 140 });
+    const row140 = (r.body?.rows || []).find(x => x.vmd === 140);
+    check(r.status === 200 && typeof row140?.onTarget === 'number',
+      'POST /algo/spray/feasibility',
+      row140 ? `140μm 命中率 ${(row140.onTarget * 100).toFixed(1)}% / 上限 ${r.body.maxSafeWind} m/s`
+        : `status=${r.status}`);
+  } catch (e) {
+    check(false, 'POST /algo/spray/feasibility', e.message);
+  }
+
   // ---- 2. WebSocket ----
   console.log('\n--- WebSocket 实时通道 ---');
   // WebSocket 连到后端所在的源（跨源部署时与页面不同源）
@@ -166,6 +202,27 @@ async function main() {
       if (!ok) check(false, `数据分析「${label}」可用`);
     }
     check(true, '数据分析六维切换无崩溃');
+
+    // 施药窗口页：确认参数联动真的生效（现场计算，不是静态文案）
+    const sprayBtn = page.locator('.nav button', { hasText: '施药窗口' }).first();
+    if (await sprayBtn.count()) {
+      await sprayBtn.click();
+      await page.waitForTimeout(3000);
+      const read = async () => ({
+        verdict: (await page.locator('.kpi .value').first().innerText()).trim(),
+        onTarget: (await page.locator('.kpi .value').nth(1).innerText()).trim(),
+      });
+      const before = await read();
+      await page.locator('input[type=range]').first().fill('8');
+      await page.waitForTimeout(3000);
+      const after = await read();
+      check(/%/.test(before.onTarget), '施药窗口页渲染', `命中率 ${before.onTarget}`);
+      check(before.onTarget !== after.onTarget, '施药窗口参数联动（现场计算）',
+        `${before.onTarget} → ${after.onTarget}`);
+      check(/超窗口/.test(after.verdict), '风速 8 m/s 判定为超窗口', after.verdict);
+    } else {
+      check(false, '导航里有「施药窗口」');
+    }
 
     await page.screenshot({ path: 'C:/Users/ASUS/_shots/cloud-verify.png', fullPage: false });
   } catch (e) {
