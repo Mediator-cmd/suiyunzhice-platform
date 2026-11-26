@@ -28,13 +28,21 @@
 
 import { DISEASES } from './schema.js';
 import { buildSprayMission } from './planner.js';
+import { workingPoint, sampleConfidence } from './detectionmodel.js';
 
-/** 与 shared/simulator.js 保持一致的病灶中心 */
+/**
+ * 与 shared/simulator.js 保持一致的病灶中心。
+ *
+ * 位置、强度、病种、目标数四项都与模拟器逐字对齐 ——
+ * 种子是「过去 7 天的回放」，模拟器是「现在」，
+ * 两者若对不上，平台上的历史统计与实时统计就不是同一件事。
+ * （此前种子的病种与模拟器是错位的轮换，已订正。）
+ */
 const HOTSPOTS = [
-  { row: 6, col: 12, strength: 0.9, disease: 'fusarium' },
-  { row: 11, col: 24, strength: 0.7, disease: 'powdery' },
-  { row: 15, col: 8, strength: 0.5, disease: 'rust' },
-  { row: 3, col: 31, strength: 0.45, disease: 'root_rot' },
+  { row: 6, col: 12, strength: 0.9, disease: 'rust', targets: 2160 },
+  { row: 11, col: 24, strength: 0.7, disease: 'fusarium', targets: 840 },
+  { row: 15, col: 8, strength: 0.5, disease: 'leaf_blight', targets: 234 },
+  { row: 3, col: 31, strength: 0.45, disease: 'powdery', targets: 84 },
 ];
 
 /** 历史跨度（天） */
@@ -101,11 +109,19 @@ export function demoHistoryDetections(field, opts = {}) {
         // 病种：主病灶病种为主，邻格偶尔串到别的病种
         const disease = rnd() < 0.78 ? h.disease : DISEASES[Math.floor(rnd() * DISEASES.length)].code;
 
-        // 置信度：与模拟器同一套公式（strength + 距离衰减），不叠随机抖动
-        const dist = Math.hypot((col - h.col) * cellW, (row - h.row) * cellH);
-        const base = Math.min(0.98, 0.55 + h.strength * 0.35 + (60 - dist) / 300);
-        // 地面近距复核的置信度天然更高
-        const confidence = +(isRobot ? Math.min(0.99, base + 0.12) : base).toFixed(3);
+        // 置信度：按该病种的检测工作点抽样（与 shared/detectionmodel.js 同源）。
+        //
+        // 早前这里用的是「strength + 距离衰减」的连续公式，
+        // 与模拟器改用工作点后的口径不一致 ——
+        // 结果是历史数据里的高置信度占比约 92%，
+        // 而模拟器按精确率抽样只有 65% 左右，
+        // 两套数据放在一起看，平台的派单量就自相矛盾了。
+        // 现在两处都走 sampleConfidence()，口径一致。
+        const wp = workingPoint(disease);
+        const confidence = isRobot
+          // 地面近距复核：离得近、看得清，置信度天然更高
+          ? +Math.min(0.99, 0.72 + (h.strength || 0.6) * 0.2 + rnd() * 0.06).toFixed(3)
+          : sampleConfidence(wp.precision, rnd);
 
         // 发病部位：按病种的主部位，根腐病地面看根茎、空中看不到
         const def = DISEASES.find(x => x.code === disease);

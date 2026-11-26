@@ -11,8 +11,12 @@
  *   - 电池随作业消耗，航时受限
  */
 
-import { DISEASES, DEVICE_STATES } from './schema.js';
+import { DEVICE_STATES } from './schema.js';
 import { FleetExecutor } from './fleet-executor.js';
+import {
+  workingPoint, detectOccurs, sampleConfidence,
+  patchMissProbability, falsePositiveRatio,
+} from './detectionmodel.js';
 
 export class Simulator {
   constructor({ field, onTelemetry, onDetection, onDevice, dt = 0.2, detectChance = null,
@@ -28,6 +32,18 @@ export class Simulator {
     this.timer = null;
     this.seq = { 'UAV-01': 0, 'ROB-01': 0 };
     this.detSeq = 0;
+    /**
+     * 斑块级漏检判定缓存。
+     *
+     * 每一片病灶「是否被整体漏掉」只摇一次 —— 摇定之后，这片在本次运行里
+     * 就一直是「看不见的」。每次扫描都重摇的话，漏检会时有时无，
+     * 平台看到的是「偶发漏检」而不是「一片病没被发现」，
+     * 而后者才是先确认再喷这套策略真正要解决的情况。
+     *
+     * key：病灶的 row_col
+     * value：true = 这片被漏掉了
+     */
+    this.patchMissCache = new Map();
     /** 外部接管标记：平台下发了受控作业指令时，暂停自主巡逻 */
     this.manualControl = false;
 
@@ -77,11 +93,22 @@ export class Simulator {
     //
     // 修法：位置选在空地，并用 relocateHotspots() 兜底 ——
     // 以后改障碍配置也不必再手工核这一遍。
+    //
+    // 每片病灶带三个字段：
+    //   disease    病种（决定用哪一组检测工作点）
+    //   strength   严重度 [0,1]
+    //   targets    这片里的目标数 —— 斑块级漏检概率的输入。
+    //
+    // targets 的量级取自队友实验的真实分布（data/fields/*.npz，
+    // 三个病种 18 地块共 283 个斑块）：
+    //   P5 = 84，P25 = 832，中位 = 1396，P95 = 4233
+    // 注意这个量级 —— 它直接决定了下面「斑块级漏检」的机制
+    // 在什么情况下才会触发（见 detectionmodel.js 的说明）。
     this.hotspots = this.relocateHotspots([
-      { row: 6, col: 12, strength: 0.9 },
-      { row: 11, col: 24, strength: 0.7 },
-      { row: 15, col: 8, strength: 0.5 },
-      { row: 3, col: 31, strength: 0.45 },
+      { row: 6, col: 12, strength: 0.9, disease: 'rust', targets: 2160 },
+      { row: 11, col: 24, strength: 0.7, disease: 'fusarium', targets: 840 },
+      { row: 15, col: 8, strength: 0.5, disease: 'leaf_blight', targets: 234 },
+      { row: 3, col: 31, strength: 0.45, disease: 'powdery', targets: 84 },
     ]);
 
     this.uav = {
@@ -259,6 +286,7 @@ export class Simulator {
     // 沿自动规划航线往返（简化：沿 X 方向，Y 方向每条航线换一行）
     const lineHeight = 5; // 网格 5m
     const maxY = this.field.heightM;
+    const prevX = u.x, prevY = u.y;
     u.x += u.dir * u.spd * dt;
     if (u.x > this.field.widthM - 5) { u.x = this.field.widthM - 5; u.dir = -1; u.line++; u.y += lineHeight; }
     if (u.x < 5) { u.x = 5; u.dir = 1; u.line++; u.y += lineHeight; }
@@ -274,8 +302,73 @@ export class Simulator {
     this.emitTelemetry(u);
     this.syncDevice(u);
 
-    // 沿途识别：按概率产生检测结果
-    if (Math.random() < this.detectChance) this.emitDetection(u);
+    // 沿途识别。
+    //
+    // 这里**不能**只取飞机当前位置一个点。
+    // 云端一拍是 15 秒仿真时间，无人机以 6 m/s 飞过 **90 m**，
+    // 单点取样等于「飞了 90 m，只在落点抽了一次」——
+    // 采到的点几乎随机落在背景区或病灶区，
+    // 于是两个后果：
+    //   · 检出量与航线覆盖无关（飞没飞过那片田都一样）
+    //   · 误检几乎不出现（背景点虽多，但真检出基数小，配额发不出去）
+    //
+    // 正确做法：沿这一拍飞过的**整段航线**等间距取样，
+    // 每个采样点独立走检测器工作点判定。
+    // 节流仍在（每拍只扫一次），但采样覆盖的是实际飞过的路径。
+    this.scanSegment(prevX, prevY, u.x, u.y);
+  }
+
+  /**
+   * 沿一段航线等间距取样，逐点判定检出。
+   *
+   * 节流方式：**调节采样密度，而不是丢弃整段**。
+   *
+   * 早前这里写成「按 detectChance 决定这一段扫不扫」——
+   * 于是 84% 的航段完全不被采样，飞机明明飞过了那片田，
+   * 平台却一次检出都没有。这不是节流，是漏扫：
+   * 云端一拍飞 90 m，漏掉 84% 的航段意味着大部分田块从未被看过，
+   * 派单量随缘，闭环数据也就失去意义。
+   *
+   * 现在改成：每一段都扫，采样点间距随 detectChance 变粗
+   * （detectChance 越小 → 采样越稀 → 产出越少，额度压力不变）。
+   * 覆盖完整，产出可控。
+   *
+   * @param {number} x0 起点 x
+   * @param {number} y0 起点 y
+   * @param {number} x1 终点 x
+   * @param {number} y1 终点 y
+   */
+  scanSegment(x0, y0, x1, y1) {
+    const len = Math.hypot(x1 - x0, y1 - y0);
+    // 采样间距 = 5 m（一个网格）× 密度倒数
+    // detectChance=1 → 5 m 一个点；detectChance=0.16 → 约 31 m 一个点
+    const spacing = 5 / Math.max(0.05, this.detectChance);
+    const n = Math.max(1, Math.min(30, Math.round(len / spacing)));
+    for (let i = 1; i <= n; i++) {
+      const t = i / n;
+      const x = x0 + (x1 - x0) * t;
+      const y = y0 + (y1 - y0) * t;
+      this.emitDetectionAt(x, y, 'canopy', 'uav');
+    }
+  }
+
+  /**
+   * 记录「这个格的这个病种已经报过了」。
+   *
+   * 航线连续扫描时，相邻采样点落在同一个格里是常事；
+   * 不去重的话，同一片病害会被反复报出，
+   // 派单量与检出量都会虚高。
+   *
+   * 去重键：病种 + 格（row_col）。
+   * 误检不去重 —— 误检本来就该发生在不同位置，
+   * 而且它的数量本就该按 Poisson 配额来，不该被去重压掉。
+   */
+  markReported(det) {
+    if (!this.reportedKeys) this.reportedKeys = new Set();
+    const key = `${det.disease}_${det.grid.row}_${det.grid.col}`;
+    if (this.reportedKeys.has(key)) return false;
+    this.reportedKeys.add(key);
+    return true;
   }
 
   stepRobot(dt) {
@@ -304,8 +397,17 @@ export class Simulator {
         // 开始执行的时刻 —— 执行段时延从此刻算起，不含排队等待
         r.target.startedAt = Date.now();
       } else {
-        r.x += (dx / d) * r.spd * dt;
-        r.y += (dy / d) * r.spd * dt;
+        // 单步位移必须按剩余距离截断。
+        //
+        // 云端一拍 15 秒，机器人 1.2 m/s → 每步最多走 18 m。
+        // 若目标只剩 4.7 m 还照走 18 m，就会跨过目标，
+        // 下一拍又朝回走 18 m —— 在目标两侧来回震荡，
+        // 永远进不了 1.2 m 的到位判定。
+        // 实测：机器人在距目标 4.7 m 处卡死 30 拍，
+        // 复核一单都没完成，队列无限堆积。
+        const step = Math.min(r.spd * dt, d);
+        r.x += (dx / d) * step;
+        r.y += (dy / d) * step;
         r.hdg = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
       }
     } else if (r.state === DEVICE_STATES.SURVEYING) {
@@ -359,8 +461,18 @@ export class Simulator {
   }
 
   emitDetection(u) {
-    const d = this.detectAt(u.x, u.y, 'canopy', 'uav');
-    if (d) this.onDetection(d);
+    this.emitDetectionAt(u.x, u.y, 'canopy', 'uav');
+  }
+
+  /** 单点检出并上报（真检出按格去重，误检不去重） */
+  emitDetectionAt(x, y, part, kind) {
+    const d = this.detectAt(x, y, part, kind);
+    if (!d) return null;
+    // 去重放在上报这一层 —— 无论调用方是谁（航线扫描 / 定点采集），
+    // 同一格同一病种只报一次，规则才是一致的。
+    if (!d.falsePositive && !this.markReported(d)) return null;
+    this.onDetection(d);
+    return d;
   }
 
   emitRobotDetection(r) {
@@ -421,6 +533,90 @@ export class Simulator {
     });
   }
 
+  /**
+   * 发放一次误检机会。
+   *
+   * 配额按 Poisson 期望累积：
+   *   期望误检数 = 真检出数 × fpRatio × 0.35
+   *   fpRatio = (1 − precision) / precision
+   *
+   * 做法：维护「已发放的误检数」与「按期望应发放的数」两个计数，
+   * 只有当已发放数 < 应发放数时才真正放行。
+   * 这与队友 detection_map.py 的 Poisson 采样同量级，
+   * 但不引入随机方差 —— 平台的演示数据需要稳定可复现。
+   *
+   * @returns {boolean} true = 本次放行一次误检
+   */
+  consumeFalsePositiveSlot(precision) {
+    const fpRatio = falsePositiveRatio(precision);
+    const hits = this.expectedTrueHits || 0;
+    // 期望误检数 = 格级真检出数 × fpRatio × 0.35（与队友 Poisson 模型同口径）
+    const expected = hits * fpRatio * 0.35;
+    this.falsePositiveIssued = this.falsePositiveIssued || 0;
+    // 下限 1：真检出已经攒到一定量时，至少放行一次误检。
+    //
+    // 为什么需要下限：云端采样密度约 31 m/点，而病灶影响半径只有 ~7 m，
+    // 采样点大多落在病灶附近，背景区很少被采到 ——
+    // 于是「期望误检数」虽然有 5 次，但没人去背景区领这个配额，
+    // 误检就一次都不出现，平台看不到「派了单却是假警报」的代价。
+    //
+    // 队友模型里 n_fp 是 Poisson 采样，期望为 5 时几乎必然至少出现 1 次；
+    // 确定性实现要还原这个性质，就不能只按「领配额」的方式发。
+    const quota = Math.max(expected, hits >= 8 ? 1 : 0);
+    if (this.falsePositiveIssued >= quota) return false;
+    this.falsePositiveIssued++;
+    return true;
+  }
+
+  /**
+   * 这片病灶本次运行中是否被整体漏掉。
+   *
+   * 判定只摇一次并缓存 —— 摇定之后这片就一直「看不见」。
+   * 概率取自队友模型：p_miss = (1 − recall·0.85)^n_targets
+   *
+   * @returns {boolean} true = 被漏掉
+   */
+  patchDetectable(hotspot, wp) {
+    const key = `${hotspot.row}_${hotspot.col}`;
+    if (!this.patchMissCache.has(key)) {
+      const pMiss = patchMissProbability(wp.recall, hotspot.targets || 1);
+      this.patchMissCache.set(key, Math.random() < pMiss);
+    }
+    return !this.patchMissCache.get(key);
+  }
+
+  /**
+   * 构造一次误检（背景误报）。
+   *
+   * 误报落在健康区域 —— 权重 w = 1 − 0.7·severity，
+   * 即越健康的地方越容易误报。这里用「离最近病灶的距离」近似健康度：
+   * 离病灶越远越可能是背景。
+   *
+   * 误检会真的走完后面的流程 —— 派单、复核、施药 ——
+   * 所以它在平台里表现为「查出来不是病害、白跑一趟」，
+   * 这正是误检的真实代价。
+   */
+  makeFalsePositive(x, y, part, kind, disease) {
+    const row = Math.min(this.field.gridRows - 1, Math.max(0, Math.floor(y / this.field.cellH)));
+    const col = Math.min(this.field.gridCols - 1, Math.max(0, Math.floor(x / this.field.cellW)));
+    // 误报的置信度普遍不高 —— 高置信度误报是少数，正是它们最伤
+    const confidence = +(0.30 + Math.random() * 0.35).toFixed(3);
+    return {
+      detId: `D-${Date.now()}-${++this.detSeq}`,
+      ts: Date.now(),
+      deviceId: kind === 'uav' ? 'UAV-01' : 'ROB-01',
+      kind,
+      part: part || 'leaf',
+      disease,
+      confidence,
+      bbox: { x: 120 + Math.random() * 400, y: 90 + Math.random() * 300, w: 40 + Math.random() * 90, h: 40 + Math.random() * 90 },
+      geo: { x: +x.toFixed(2), y: +y.toFixed(2) },
+      grid: { row, col },
+      model: 'SAN-GAT-RL',
+      falsePositive: true,
+    };
+  }
+
   detectAt(x, y, part, kind, forceDisease = null) {
     // 找最近病灶中心
     let best = null, bestDist = 1e9;
@@ -429,8 +625,10 @@ export class Simulator {
       const dist = Math.hypot(c.x - x, c.y - y);
       if (dist < bestDist) { bestDist = dist; best = h; }
     }
-    // 距病灶越近，检出概率越高
-    const prob = Math.max(0, best.strength - bestDist / 60);
+    if (!best) return null;
+
+    const disease = forceDisease || best.disease || 'rust';
+    const wp = workingPoint(disease);
     //
     // 地面复核**必须**出结果：
     //   机器人是被「空中发现了疑似病斑」派过去的，
@@ -445,8 +643,6 @@ export class Simulator {
       const conf = +Math.min(0.99, 0.72 + best.strength * 0.2 + Math.random() * 0.06).toFixed(3);
       const row = Math.min(this.field.gridRows - 1, Math.max(0, Math.floor(y / this.field.cellH)));
       const col = Math.min(this.field.gridCols - 1, Math.max(0, Math.floor(x / this.field.cellW)));
-      const disease = forceDisease
-        || (['root_rot', 'fusarium'].includes(best.disease) ? best.disease : best.disease);
       return {
         detId: `D-${Date.now()}-${++this.detSeq}`,
         ts: Date.now(),
@@ -461,26 +657,82 @@ export class Simulator {
         model: 'SAN-GAT-RL',
       };
     }
-    if (Math.random() > prob) return null;
 
+    // ---- 空中检出：按检测器工作点判定，而不是「离得近就检得出」----
+    //
+    // 三个机制（与队友 code/detection_map.py 对齐）：
+    //   ① 斑块级漏检：整片病灶的目标全漏 → 这片直接没了
+    //   ② 单目标检出概率随严重度上升（早期症状难发现）
+    //   ③ 背景误检：健康处也会有误报，会变成真实的误喷
+    //
+    // 没有①的话平台永远看不到「一片病害没被发现」，
+    // 没有③的话平台永远看不到「派了单却不是病害」的返工。
+    const patchOk = this.patchDetectable(best, wp);
+    if (!patchOk) return null;
+
+    // 采样点必须落在这片病灶的影响范围内。
+    //
+    // 这里刻意**不**把「距离」乘进检出概率 ——
+    // 队友的模型是格级的：检出概率只由该格的严重度决定
+    // （p_det = recall · (0.15 + 0.85·σ(6(sev−0.22)))），
+    // 因为「严重度」本身已经编码了「这片有多明显」。
+    // 若再乘一个距离因子，等于把同一个量算了两次，
+    // 结果是离病灶稍远就几乎检不出（实测采样 4000 点零检出）。
+    //
+    // 位置只该决定「有没有采到这个格」，不该决定「采到了能不能检出」。
+    const reach = 10 + best.strength * 14;   // 4.5~7 m，随严重度
+    if (bestDist > reach) {
+      // 落在背景区 —— 这里才可能出**误检**。
+      //
+      // 误检按**计数**给出，而不是每次采样独立摇一次：
+      //   误检数 ~ Poisson(真检出数 × fpRatio × 0.35)
+      // 这与队友 detection_map.py 一致（那里也是 Poisson 采样）。
+      //
+      // 若改成「每次采样独立判定」，误检占比会随采样密度漂移 ——
+      // 扫得越密，背景区的采样点越多，误检占比越高，
+      // 最后会离谱到「每三条检出有一条是假的」。
+      // 计数式的量级只跟真检出数挂钩，与采样密度无关。
+      if (this.consumeFalsePositiveSlot(wp.precision)) {
+        return this.makeFalsePositive(x, y, part, kind, disease);
+      }
+      return null;
+    }
+
+    if (!detectOccurs(wp.recall, best.strength, Math.random)) return null;
+    // 工作点检出计数 —— 误检配额的基数。
+    //
+    // 口径说明：这里计的是**格级**真检出（同一格同一病种只计一次），
+    // 与队友 detection_map.py 的「检测地图」同口径 ——
+    // 他的模型是格级的，每格各自决定检不检出，误检数是
+    // Poisson(格级真检出期望 × fpRatio × 0.35)。
+    //
+    // 之前这里计的是「判为检出的次数」（含重复采样），
+    // 而上报时又按格去重，两者口径不一致 ——
+    // 结果误检占比被推到 46%，比设计值 35% 高出一截。
+    // 统一到格级后，误检占比才会落在真实量级上。
     const row = Math.min(this.field.gridRows - 1, Math.max(0, Math.floor(y / this.field.cellH)));
     const col = Math.min(this.field.gridCols - 1, Math.max(0, Math.floor(x / this.field.cellW)));
-
-    // 病种：靠近赤霉/根腐（需要近地复核）概率更高
-    const needsGround = ['root_rot', 'fusarium'];
-    let disease = forceDisease;
-    if (!disease) {
-      const pool = needsGround.filter(d => Math.random() < 0.35);
-      disease = pool.length ? pool[Math.floor(Math.random() * pool.length)]
-        : DISEASES[Math.floor(Math.random() * 4)].code;
+    const gridKey = `${disease}_${row}_${col}`;
+    if (!this.trueHitGrids) this.trueHitGrids = new Set();
+    if (!this.trueHitGrids.has(gridKey)) {
+      this.trueHitGrids.add(gridKey);
+      this.expectedTrueHits = (this.expectedTrueHits || 0) + 1;
     }
+
+    // 病种由病灶本身决定 —— 必须与上面取工作点用的是同一个病种，
+    // 否则「按 A 病种的工作点判定、按 B 病种派单」，口径就脱节了。
+    // 需要近地复核的病种：根茎部与穗部潜藏，空中看不清。
+    const needsGround = ['root_rot', 'fusarium', 'loose_smut'];
 
     // 空中看不清叶下/根茎 → 这些部位标记为需复核
     const effectivePart = kind === 'uav' && needsGround.includes(disease) ? 'stem' : part;
 
-    // 置信度：近病灶高、远低；部分样本刻意偏低触发复核
-    const base = Math.min(0.98, 0.55 + best.strength * 0.35 + (60 - bestDist) / 300);
-    const confidence = +(Math.random() < 0.3 ? base * (0.55 + Math.random() * 0.25) : base).toFixed(3);
+    // 置信度：按该病种的检测工作点抽样。
+    //   高置信度（≥0.75）的比例 = 精确率 —— 这部分直接派单；
+    //   低置信度的部分 = 漏掉的真阳性 + 一部分误检，会转地面复核。
+    //   这样平台的派单量直接受检测器工作点约束，
+    //   而不是「只要飞过就一定派单」。
+    const confidence = sampleConfidence(wp.precision, Math.random);
 
     const det = {
       detId: `D-${Date.now()}-${++this.detSeq}`,
